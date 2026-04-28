@@ -6,7 +6,7 @@ Record significant decisions, milestones, and AI-made changes here. Keep entries
 
 ## Current Status
 
-The project has its initial Tauri, React, TypeScript, and xterm.js scaffold. The app now starts a PowerShell-backed PTY session from the Tauri backend and connects it to the xterm.js frontend. Ollama integration is not implemented yet.
+The project has its initial Tauri, React, TypeScript, and local Ollama scaffold. The app has pivoted from direct terminal emulation to a Warp/Cursor-style block command workspace where React owns input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and local AI prompts.
 
 ## Decisions
 
@@ -35,6 +35,12 @@ The first version should use a configuration file for AI settings. A settings UI
 ### 2026-04-28: Command Execution Safety
 
 AI-generated commands should not be treated as ordinary prose. They should be parsed through a deliberate command execution path. Risk controls and user confirmation should be added before enabling broad agentic command execution.
+
+### 2026-04-29: Block Console Pivot
+
+DweTerm's primary MVP is now an AI command workspace instead of a direct terminal emulator.
+
+The app should favor React-rendered command and AI blocks, custom input styling, structured stdout/stderr/exit metadata, and explicit command safety surfaces. Non-interactive PowerShell command execution is the first backend. Full terminal emulation, PTY sessions, interactive TUIs, and raw xterm rendering are no longer part of the primary MVP path.
 
 ## Progress Log
 
@@ -145,6 +151,49 @@ Reasoning:
 Files changed:
 
 - `.cursor/rules/project-memory.mdc`
+- `PROGRESS.md`
+
+### 2026-04-29: Natural-Language AI Loop
+
+Implemented the first local AI response loop for terminal input.
+
+Reasoning:
+
+- DweTerm should preserve ordinary PowerShell behavior while detecting likely natural-language prompts at Enter time.
+- The frontend now keeps a conservative line buffer, routes likely prose and `ai:`-prefixed input to AI, and prints `[DweTerm AI]` responses into xterm without sending AI output to the PTY.
+- The Tauri backend now loads `dweterm.config.json` and calls local Ollama's `/api/chat` endpoint with `stream: false`.
+- AI-generated command execution remains disabled and intentionally outside the shell write path.
+
+Files changed:
+
+- `src/App.tsx`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/lib.rs`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Block Command Workspace
+
+Replaced the xterm/PTY MVP path with a React-managed block console.
+
+Reasoning:
+
+- The product needs Warp/Cursor-style control over input, output, content structure, and styling, which is difficult when the shell owns the terminal screen.
+- Commands now run as non-interactive PowerShell executions and return structured stdout, stderr, exit code, duration, and cwd data.
+- Natural-language prompts continue to route to local Ollama and render as AI blocks.
+- The MVP intentionally excludes interactive terminal applications and raw PTY behavior.
+
+Files changed:
+
+- `src/App.tsx`
+- `src/App.css`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/lib.rs`
+- `package.json`
+- `package-lock.json`
+- `README.md`
 - `PROGRESS.md`
 
 ## Future Log Template

@@ -1,12 +1,12 @@
 # DweTerm
 
-DweTerm is a desktop terminal emulator built with Tauri, React, TypeScript, and xterm.js.
+DweTerm is an AI-aware command workspace built with Tauri, React, TypeScript, and PowerShell.
 
-The first goal is to behave like a normal terminal. The planned AI layer will detect natural-language input, send it to a configured local Ollama model, render the response in the terminal, and only run AI-suggested commands through an explicit safety path.
+The app uses a Warp/Cursor-style block console instead of direct terminal emulation. React owns the command input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and sends natural-language prompts to a configured local Ollama model.
 
 ## Current Status
 
-The project has its initial Tauri + React + TypeScript scaffold and a first PowerShell-backed terminal. The frontend renders xterm.js, while the Tauri backend starts PowerShell through a PTY and streams shell output back to the UI. Ollama integration is planned next.
+The project has its initial Tauri + React + TypeScript scaffold and a first block-based command workspace. Commands run as non-interactive PowerShell executions and render stdout, stderr, exit status, duration, and current working directory as styled blocks. Natural-language prompts render as AI blocks backed by local Ollama.
 
 ## Prerequisites
 
@@ -16,9 +16,9 @@ Install these on the host machine:
 - Rust and Cargo from [rustup](https://www.rust-lang.org/tools/install).
 - Tauri Windows prerequisites from the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/).
 - Microsoft Edge WebView2 Runtime, usually already present on Windows 10/11.
-- Ollama from [ollama.com](https://ollama.com/) for future AI features.
+- Ollama from [ollama.com](https://ollama.com/) for local AI responses.
 
-DweTerm is intentionally developed host-native for the desktop workflow. Tauri needs access to native windowing, WebView2, host shell processes, and PTY behavior.
+DweTerm is intentionally developed host-native for the desktop workflow. Tauri needs access to native windowing, WebView2, and host shell processes.
 
 ## Setup
 
@@ -55,6 +55,24 @@ Run only the Vite frontend during UI work:
 npm run dev
 ```
 
+## Command Workspace
+
+DweTerm renders each submission as a block:
+
+- Shell commands run through `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`.
+- Command blocks show stdout, stderr, exit code, elapsed time, and current working directory.
+- Directory changes such as `cd ..` are tracked for later command blocks.
+- Interactive terminal programs and full-screen TUIs are outside the current MVP scope.
+
+## AI Prompt Detection
+
+DweTerm inspects the submitted input before deciding whether it is a command or an AI prompt.
+
+- Ordinary shell commands, PowerShell cmdlets, paths, assignments, flags, and command separators run as command blocks.
+- Likely natural-language questions or requests are intercepted and sent to local Ollama.
+- Prefix a line with `ai:` to force AI routing, for example `ai: explain Get-ChildItem`.
+- AI responses render as AI blocks. They are not sent to PowerShell or executed.
+
 ## Build
 
 Build the frontend:
@@ -71,7 +89,7 @@ npm run tauri build
 
 ## Ollama Setup
 
-AI features are not wired yet, but the first provider is local Ollama. Before using those features later, make sure Ollama is running:
+The first AI provider is local Ollama. Before using AI prompts, make sure Ollama is running:
 
 ```powershell
 ollama serve
