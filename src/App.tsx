@@ -1,120 +1,259 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { FitAddon } from "@xterm/addon-fit";
-import { Terminal } from "@xterm/xterm";
-import "@xterm/xterm/css/xterm.css";
 import "./App.css";
 
+import { TopBar } from "./components/TopBar";
+import { StatusBar } from "./components/StatusBar";
+import { ConsoleBlockView } from "./components/ConsoleBlockView";
+import { Composer } from "./components/Composer";
+import { EmptyState } from "./components/EmptyState";
+
+import {
+  AI_PREFIX,
+  looksLikeNaturalLanguage,
+  stripAiPrefix,
+} from "./lib/detectInputKind";
+import {
+  AiBlock,
+  CommandBlock,
+  CommandResult,
+  ConsoleBlock,
+  ShellInfo,
+} from "./lib/types";
+
+function createBlockId() {
+  return crypto.randomUUID();
+}
+
+function updateBlock(blocks: ConsoleBlock[], nextBlock: ConsoleBlock) {
+  return blocks.map((block) => (block.id === nextBlock.id ? nextBlock : block));
+}
+
+type AiStreamChunk = {
+  blockId: string;
+  kind: "thinking" | "response";
+  text: string;
+};
+
 function App() {
-  const terminalRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const [blocks, setBlocks] = useState<ConsoleBlock[]>([]);
+  const [shellInfo, setShellInfo] = useState<ShellInfo | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    if (!terminalRef.current) {
-      return;
-    }
-
-    let disposed = false;
-    let terminalStarted = false;
-
-    const terminal = new Terminal({
-      allowProposedApi: true,
-      cursorBlink: true,
-      fontFamily: "Cascadia Mono, Consolas, monospace",
-      fontSize: 14,
-      scrollback: 5000,
-      theme: {
-        background: "#0d1117",
-        foreground: "#d6deeb",
-        cursor: "#f8fafc",
-        selectionBackground: "#334155",
-      },
-    });
-    const fitAddon = new FitAddon();
-
-    terminal.loadAddon(fitAddon);
-    terminal.open(terminalRef.current);
-    fitAddon.fit();
-
-    const resizeTerminal = () => {
-      fitAddon.fit();
-
-      if (!terminalStarted) {
-        return;
-      }
-
-      invoke("resize_terminal", {
-        cols: terminal.cols,
-        rows: terminal.rows,
-      }).catch((error) => {
-        terminal.write(`\r\n[DweTerm] resize failed: ${String(error)}\r\n`);
-      });
-    };
-
-    const startTerminal = async () => {
+    void (async () => {
       try {
-        await invoke("start_terminal", {
-          cols: terminal.cols,
-          rows: terminal.rows,
-        });
-        terminalStarted = true;
-      } catch (error) {
-        terminal.write(`\r\n[DweTerm] failed to start terminal: ${String(error)}\r\n`);
+        const info = await invoke<ShellInfo>("get_shell_info");
+        setShellInfo(info);
+      } catch {
+        setShellInfo(null);
       }
-    };
+    })();
+  }, []);
 
-    const outputListener = listen<string>("terminal-output", (event) => {
-      terminal.write(event.payload);
-    });
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
 
-    const exitListener = listen("terminal-exit", () => {
-      if (!disposed) {
-        terminal.write("\r\n[DweTerm] terminal process exited\r\n");
-      }
-      terminalStarted = false;
-    });
+    void (async () => {
+      unlisten = await listen<AiStreamChunk>(
+        "dweterm://ai-stream-chunk",
+        (event) => {
+          const chunk = event.payload;
+          if (!chunk?.blockId || !chunk.text) {
+            return;
+          }
 
-    const inputDisposable = terminal.onData((data) => {
-      if (!terminalStarted) {
-        return;
-      }
+          setBlocks((current) =>
+            current.map((block) => {
+              if (block.kind !== "ai" || block.id !== chunk.blockId) {
+                return block;
+              }
 
-      invoke("write_terminal", { data }).catch((error) => {
-        terminal.write(`\r\n[DweTerm] write failed: ${String(error)}\r\n`);
-      });
-    });
+              if (chunk.kind === "thinking") {
+                return {
+                  ...block,
+                  thinking: `${block.thinking ?? ""}${chunk.text}`,
+                };
+              }
 
-    const resizeObserver = new ResizeObserver(resizeTerminal);
-    resizeObserver.observe(terminalRef.current);
-    window.addEventListener("resize", resizeTerminal);
-    void startTerminal();
+              return {
+                ...block,
+                response: `${block.response ?? ""}${chunk.text}`,
+              };
+            }),
+          );
+        },
+      );
+    })();
 
     return () => {
-      disposed = true;
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", resizeTerminal);
-      inputDisposable.dispose();
-      void outputListener.then((unlisten) => unlisten());
-      void exitListener.then((unlisten) => unlisten());
-      void invoke("stop_terminal");
-      terminal.dispose();
+      unlisten?.();
     };
   }, []);
 
-  return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">DweTerm</p>
-          <h1>AI-aware terminal</h1>
-        </div>
-        <span className="status-pill">PowerShell</span>
-      </header>
+  useEffect(() => {
+    historyRef.current?.scrollTo({
+      top: historyRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [blocks]);
 
-      <section className="terminal-panel" aria-label="DweTerm terminal">
-        <div ref={terminalRef} className="terminal-host" />
-      </section>
-    </main>
+  const submittedHistory = useMemo(
+    () => blocks.map((block) => block.input),
+    [blocks],
+  );
+
+  const runAiPrompt = async (rawInput: string) => {
+    const prompt = stripAiPrefix(rawInput);
+    const block: AiBlock = {
+      id: createBlockId(),
+      kind: "ai",
+      input: rawInput,
+      status: "running",
+      startedAt: Date.now(),
+      shellSnapshot: shellInfo,
+    };
+
+    setBlocks((current) => [...current, block]);
+    const start = performance.now();
+
+    try {
+      const response = await invoke<string>("ask_local_llm_stream", {
+        prompt,
+        blockId: block.id,
+      });
+      const durationMs = Math.round(performance.now() - start);
+      setBlocks((current) =>
+        current.map((entry) =>
+          entry.kind === "ai" && entry.id === block.id
+            ? {
+                ...entry,
+                status: "success",
+                response: response || entry.response,
+                durationMs,
+              }
+            : entry,
+        ),
+      );
+    } catch (error) {
+      const durationMs = Math.round(performance.now() - start);
+      setBlocks((current) =>
+        current.map((entry) =>
+          entry.kind === "ai" && entry.id === block.id
+            ? {
+                ...entry,
+                status: "error",
+                error: String(error),
+                durationMs,
+              }
+            : entry,
+        ),
+      );
+    }
+  };
+
+  const runCommand = async (command: string) => {
+    const block: CommandBlock = {
+      id: createBlockId(),
+      kind: "command",
+      input: command,
+      status: "running",
+      startedAt: Date.now(),
+    };
+
+    setBlocks((current) => [...current, block]);
+
+    try {
+      const result = await invoke<CommandResult>("run_shell_command", { command });
+      setShellInfo(result.shellInfo);
+      setBlocks((current) =>
+        updateBlock(current, {
+          ...block,
+          status: result.exitCode === 0 ? "success" : "error",
+          result,
+        }),
+      );
+    } catch (error) {
+      setBlocks((current) =>
+        updateBlock(current, {
+          ...block,
+          status: "error",
+          error: String(error),
+        }),
+      );
+    }
+  };
+
+  const handleSubmit = async (
+    rawInput: string,
+    options: { forceAi: boolean },
+  ) => {
+    if (isBusy) return;
+    const trimmed = rawInput.trim();
+    if (!trimmed) return;
+
+    setIsBusy(true);
+    try {
+      const forced = options.forceAi
+        ? trimmed.toLowerCase().startsWith(AI_PREFIX)
+          ? trimmed
+          : `${AI_PREFIX} ${trimmed}`
+        : trimmed;
+
+      if (options.forceAi || looksLikeNaturalLanguage(forced)) {
+        await runAiPrompt(forced);
+      } else {
+        await runCommand(forced);
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleClear = () => {
+    setBlocks([]);
+  };
+
+  return (
+    <div className="app-root">
+      <TopBar />
+      <main className="terminal-surface">
+        <section
+          className="block-history"
+          ref={historyRef}
+          aria-label="DweTerm command history"
+        >
+          {blocks.length === 0 ? (
+            <EmptyState cwd={shellInfo?.cwd ?? "Workspace"} />
+          ) : (
+            blocks.map((block) => (
+              <ConsoleBlockView key={block.id} block={block} />
+            ))
+          )}
+        </section>
+
+        <div className="composer-shell">
+          <StatusBar shell={shellInfo} />
+          <Composer
+            history={submittedHistory}
+            isBusy={isBusy}
+            onSubmit={(value, options) => void handleSubmit(value, options)}
+          />
+          {blocks.length > 0 && (
+            <button
+              type="button"
+              className="clear-history-button"
+              onClick={handleClear}
+              title="Clear blocks (does not affect shell)"
+            >
+              clear blocks
+            </button>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
 

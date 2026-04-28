@@ -1,12 +1,12 @@
 # DweTerm
 
-DweTerm is a desktop terminal emulator built with Tauri, React, TypeScript, and xterm.js.
+DweTerm is an AI-aware command workspace built with Tauri, React, TypeScript, and PowerShell.
 
-The first goal is to behave like a normal terminal. The planned AI layer will detect natural-language input, send it to a configured local Ollama model, render the response in the terminal, and only run AI-suggested commands through an explicit safety path.
+The app uses a Warp/Cursor-style block console instead of direct terminal emulation. React owns the command input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and sends natural-language prompts to a configured local Ollama model.
 
 ## Current Status
 
-The project has its initial Tauri + React + TypeScript scaffold and a first PowerShell-backed terminal. The frontend renders xterm.js, while the Tauri backend starts PowerShell through a PTY and streams shell output back to the UI. Ollama integration is planned next.
+The project has a Warp-style command workspace. The window has a slim top toolbar (sidebar/grid toggles, center search, profile area), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive PowerShell executions; each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
 
 ## Prerequisites
 
@@ -16,9 +16,9 @@ Install these on the host machine:
 - Rust and Cargo from [rustup](https://www.rust-lang.org/tools/install).
 - Tauri Windows prerequisites from the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/).
 - Microsoft Edge WebView2 Runtime, usually already present on Windows 10/11.
-- Ollama from [ollama.com](https://ollama.com/) for future AI features.
+- Ollama from [ollama.com](https://ollama.com/) for local AI responses.
 
-DweTerm is intentionally developed host-native for the desktop workflow. Tauri needs access to native windowing, WebView2, host shell processes, and PTY behavior.
+DweTerm is intentionally developed host-native for the desktop workflow. Tauri needs access to native windowing, WebView2, and host shell processes.
 
 ## Setup
 
@@ -55,6 +55,36 @@ Run only the Vite frontend during UI work:
 npm run dev
 ```
 
+## Command Workspace
+
+DweTerm renders each submission as a block:
+
+- Shell commands run through `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`.
+- Each block has a Warp-style prompt header showing app version, path (with `~` for the user's home), `git:(branch)`, dirty/ahead/behind counts, and elapsed time.
+- Command blocks show stdout, stderr, exit status, and current working directory.
+- Directory changes such as `cd ..` are tracked for later command blocks.
+- A status bar above the composer shows the live PowerShell version, current path, git branch, and `± N` dirty file count.
+- Interactive terminal programs and full-screen TUIs are outside the current MVP scope.
+
+### Composer Shortcuts
+
+- `Enter` runs the current command or routes natural language to the local AI agent.
+- `Ctrl + Shift + Enter` forces an `/agent` conversation regardless of the input shape.
+- `↑` / `↓` navigates the in-session command history; the partially-typed line is preserved as a draft.
+- `Tab` or `→` (at end of line) accepts the ghost autocomplete suggested from history.
+
+## AI Prompt Detection
+
+DweTerm inspects the submitted input before deciding whether it is a command or an AI prompt.
+
+- Ordinary shell commands, PowerShell cmdlets, paths, assignments, flags, and command separators run as command blocks.
+- Likely natural-language questions or requests are intercepted and sent to local Ollama.
+- Prefix a line with `ai:` to force AI routing, for example `ai: explain Get-ChildItem`.
+- AI responses stream into AI blocks chunk-by-chunk as they are generated.
+- If the model emits thinking text, DweTerm renders it in a separate "thinking" section from the final response section.
+- When AI generation completes, the thinking section auto-collapses; users can expand or collapse it manually with a chevron toggle.
+- AI output is display-only; it is not sent to PowerShell or executed.
+
 ## Build
 
 Build the frontend:
@@ -71,7 +101,7 @@ npm run tauri build
 
 ## Ollama Setup
 
-AI features are not wired yet, but the first provider is local Ollama. Before using those features later, make sure Ollama is running:
+The first AI provider is local Ollama. Before using AI prompts, make sure Ollama is running:
 
 ```powershell
 ollama serve

@@ -6,7 +6,7 @@ Record significant decisions, milestones, and AI-made changes here. Keep entries
 
 ## Current Status
 
-The project has its initial Tauri, React, TypeScript, and xterm.js scaffold. The app now starts a PowerShell-backed PTY session from the Tauri backend and connects it to the xterm.js frontend. Ollama integration is not implemented yet.
+The project has its initial Tauri, React, TypeScript, and local Ollama scaffold. The app has pivoted from direct terminal emulation to a Warp/Cursor-style block command workspace where React owns input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and local AI prompts. The UI has been restyled to mirror Warp: a slim top toolbar (sidebar/grid toggles, center search, profile cluster), monospace prompt headers per block (app version, path, `git:(branch)`, dirty/ahead/behind, duration), a status chip bar (shell, cwd, branch, ± dirty count), and a single-line composer with ghost-text autocomplete and history navigation.
 
 ## Decisions
 
@@ -35,6 +35,12 @@ The first version should use a configuration file for AI settings. A settings UI
 ### 2026-04-28: Command Execution Safety
 
 AI-generated commands should not be treated as ordinary prose. They should be parsed through a deliberate command execution path. Risk controls and user confirmation should be added before enabling broad agentic command execution.
+
+### 2026-04-29: Block Console Pivot
+
+DweTerm's primary MVP is now an AI command workspace instead of a direct terminal emulator.
+
+The app should favor React-rendered command and AI blocks, custom input styling, structured stdout/stderr/exit metadata, and explicit command safety surfaces. Non-interactive PowerShell command execution is the first backend. Full terminal emulation, PTY sessions, interactive TUIs, and raw xterm rendering are no longer part of the primary MVP path.
 
 ## Progress Log
 
@@ -145,6 +151,117 @@ Reasoning:
 Files changed:
 
 - `.cursor/rules/project-memory.mdc`
+- `PROGRESS.md`
+
+### 2026-04-29: Natural-Language AI Loop
+
+Implemented the first local AI response loop for terminal input.
+
+Reasoning:
+
+- DweTerm should preserve ordinary PowerShell behavior while detecting likely natural-language prompts at Enter time.
+- The frontend now keeps a conservative line buffer, routes likely prose and `ai:`-prefixed input to AI, and prints `[DweTerm AI]` responses into xterm without sending AI output to the PTY.
+- The Tauri backend now loads `dweterm.config.json` and calls local Ollama's `/api/chat` endpoint with `stream: false`.
+- AI-generated command execution remains disabled and intentionally outside the shell write path.
+
+Files changed:
+
+- `src/App.tsx`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/lib.rs`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Warp-Style UI Overhaul
+
+Replaced the card-style block layout with a Warp-inspired workspace.
+
+Reasoning:
+
+- The product needs to feel like a terminal that the user trusts, so blocks now render as monospace prompt headers + command line + output, instead of bordered cards.
+- Each prompt header shows app version, working directory (with `~` substitution for the user's home), `git:(branch)`, dirty/ahead/behind counts, and duration. Branch parens are red, branch name is amber, path is blue, matching the screenshot reference.
+- A new top toolbar provides sidebar/grid toggle placeholders, a centered search input, an "Update" pill, and a profile avatar. Search and toggle buttons are scaffolded UI for future features.
+- A status chip bar above the composer surfaces live PowerShell version, current path, git branch, and dirty count, fed by a new Tauri `get_shell_info` command and shell info attached to every `CommandResult`.
+- The composer is now a single-line input with caret-blink, ghost-text autocomplete from history, `↑`/`↓` history navigation that preserves the in-progress draft, `Tab`/`→` to accept the suggestion, and `Ctrl+Shift+Enter` to force a `/agent` conversation.
+- React code was split into `components/` (TopBar, StatusBar, PromptHeader, ConsoleBlockView, Composer, EmptyState) and `lib/` (types, format helpers, input detection) for readability as more features land.
+- The Rust backend now caches the PowerShell version after first detection, runs `git status --porcelain=v2 --branch` to gather branch + ahead/behind/dirty, and emits a structured `ShellInfo` payload.
+
+Files changed:
+
+- `src/App.tsx`
+- `src/App.css`
+- `src/components/TopBar.tsx`
+- `src/components/StatusBar.tsx`
+- `src/components/PromptHeader.tsx`
+- `src/components/ConsoleBlockView.tsx`
+- `src/components/Composer.tsx`
+- `src/components/EmptyState.tsx`
+- `src/lib/types.ts`
+- `src/lib/format.ts`
+- `src/lib/detectInputKind.ts`
+- `src-tauri/src/lib.rs`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Block Command Workspace
+
+Replaced the xterm/PTY MVP path with a React-managed block console.
+
+Reasoning:
+
+- The product needs Warp/Cursor-style control over input, output, content structure, and styling, which is difficult when the shell owns the terminal screen.
+- Commands now run as non-interactive PowerShell executions and return structured stdout, stderr, exit code, duration, and cwd data.
+- Natural-language prompts continue to route to local Ollama and render as AI blocks.
+- The MVP intentionally excludes interactive terminal applications and raw PTY behavior.
+
+Files changed:
+
+- `src/App.tsx`
+- `src/App.css`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/src/lib.rs`
+- `package.json`
+- `package-lock.json`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Streamed AI Chunks with Separate Thinking UI
+
+Implemented chunked AI response streaming and split rendering for thinking vs final answer text.
+
+Reasoning:
+
+- AI output should appear immediately while Ollama is generating, instead of waiting for a full blocking response.
+- Some models expose intermediate thinking tokens; those should be visible in a dedicated area so users can distinguish reasoning traces from final response content.
+- Streaming updates are keyed by block ID and emitted from Tauri as frontend events, allowing multiple AI blocks over time to stay correctly associated with their own chunks.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/lib/types.ts`
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Collapsible AI Thinking Section
+
+Updated AI block rendering so model thinking text auto-collapses after streaming finishes and can be manually toggled.
+
+Reasoning:
+
+- Thinking traces are useful but can dominate the block once the final response is available.
+- Auto-collapsing completed thinking keeps history readable while preserving access to details on demand.
+- A visible chevron toggle improves discoverability and gives users explicit control over expansion state.
+
+Files changed:
+
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `README.md`
 - `PROGRESS.md`
 
 ## Future Log Template
