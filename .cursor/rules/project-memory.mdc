@@ -1,0 +1,24 @@
+---
+description: Keep DweTerm project docs and memory aligned across AI sessions
+alwaysApply: true
+---
+
+# Project Memory
+
+Before making architectural, behavioral, or workflow changes, read:
+
+- `README.md`
+- `PLAN.md`
+- `PROGRESS.md`
+
+Use those files as the source of truth for project direction. Do not diverge from documented decisions unless the user explicitly changes direction.
+
+Update the docs when work changes project knowledge:
+
+- Update `README.md` when setup, run commands, current status, prerequisites, or user-facing behavior changes.
+- Update `PLAN.md` when roadmap, scope, priorities, architecture direction, or future implementation order changes.
+- Update `PROGRESS.md` for significant implementation progress, decisions, rejected alternatives, workflow changes, dependency additions, or AI-made changes that future agents should remember.
+
+Keep `PROGRESS.md` entries dated, concise, and specific. Include reasoning and touched files for meaningful changes.
+
+For small code-only fixes, do not force README or PLAN updates unless the user-facing workflow or project direction changed. Still update `PROGRESS.md` if the change is significant enough that a future AI agent should know about it.

@@ -1,0 +1,9 @@
+{
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "model": "llama3.2",
+    "timeoutMs": 30000,
+    "systemPrompt": "You are DweTerm's local terminal assistant. Help with shell tasks clearly and suggest commands only when they are safe and explicit.",
+    "enableCommandExecution": false
+  }
+}
