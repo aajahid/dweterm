@@ -6,7 +6,7 @@ Record significant decisions, milestones, and AI-made changes here. Keep entries
 
 ## Current Status
 
-The project has its initial Tauri, React, TypeScript, and local Ollama scaffold. The app has pivoted from direct terminal emulation to a Warp/Cursor-style block command workspace where React owns input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and local AI prompts.
+The project has its initial Tauri, React, TypeScript, and local Ollama scaffold. The app has pivoted from direct terminal emulation to a Warp/Cursor-style block command workspace where React owns input and output rendering, while the Tauri backend runs non-interactive PowerShell commands and local AI prompts. The UI has been restyled to mirror Warp: a slim top toolbar (sidebar/grid toggles, center search, profile cluster), monospace prompt headers per block (app version, path, `git:(branch)`, dirty/ahead/behind, duration), a status chip bar (shell, cwd, branch, ± dirty count), and a single-line composer with ghost-text autocomplete and history navigation.
 
 ## Decisions
 
@@ -169,6 +169,37 @@ Files changed:
 - `src/App.tsx`
 - `src-tauri/Cargo.toml`
 - `src-tauri/Cargo.lock`
+- `src-tauri/src/lib.rs`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Warp-Style UI Overhaul
+
+Replaced the card-style block layout with a Warp-inspired workspace.
+
+Reasoning:
+
+- The product needs to feel like a terminal that the user trusts, so blocks now render as monospace prompt headers + command line + output, instead of bordered cards.
+- Each prompt header shows app version, working directory (with `~` substitution for the user's home), `git:(branch)`, dirty/ahead/behind counts, and duration. Branch parens are red, branch name is amber, path is blue, matching the screenshot reference.
+- A new top toolbar provides sidebar/grid toggle placeholders, a centered search input, an "Update" pill, and a profile avatar. Search and toggle buttons are scaffolded UI for future features.
+- A status chip bar above the composer surfaces live PowerShell version, current path, git branch, and dirty count, fed by a new Tauri `get_shell_info` command and shell info attached to every `CommandResult`.
+- The composer is now a single-line input with caret-blink, ghost-text autocomplete from history, `↑`/`↓` history navigation that preserves the in-progress draft, `Tab`/`→` to accept the suggestion, and `Ctrl+Shift+Enter` to force a `/agent` conversation.
+- React code was split into `components/` (TopBar, StatusBar, PromptHeader, ConsoleBlockView, Composer, EmptyState) and `lib/` (types, format helpers, input detection) for readability as more features land.
+- The Rust backend now caches the PowerShell version after first detection, runs `git status --porcelain=v2 --branch` to gather branch + ahead/behind/dirty, and emits a structured `ShellInfo` payload.
+
+Files changed:
+
+- `src/App.tsx`
+- `src/App.css`
+- `src/components/TopBar.tsx`
+- `src/components/StatusBar.tsx`
+- `src/components/PromptHeader.tsx`
+- `src/components/ConsoleBlockView.tsx`
+- `src/components/Composer.tsx`
+- `src/components/EmptyState.tsx`
+- `src/lib/types.ts`
+- `src/lib/format.ts`
+- `src/lib/detectInputKind.ts`
 - `src-tauri/src/lib.rs`
 - `README.md`
 - `PROGRESS.md`

@@ -1,14 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
 use tauri::State;
 
 const CWD_MARKER: &str = "__DWETERM_CWD__";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Deserialize)]
 struct DweTermConfig {
@@ -52,6 +53,8 @@ struct OllamaResponseMessage {
 struct ShellState {
     cwd: Mutex<PathBuf>,
 }
+
+static CACHED_SHELL_VERSION: OnceLock<String> = OnceLock::new();
 
 fn config_candidates() -> Result<Vec<PathBuf>, String> {
     let current_dir = std::env::current_dir()
@@ -155,6 +158,26 @@ impl Default for ShellState {
     }
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GitInfo {
+    branch: Option<String>,
+    dirty: u32,
+    ahead: u32,
+    behind: u32,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ShellInfo {
+    app_version: String,
+    shell_name: String,
+    shell_version: String,
+    cwd: String,
+    home_dir: Option<String>,
+    git: Option<GitInfo>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandResult {
@@ -164,6 +187,111 @@ struct CommandResult {
     exit_code: i32,
     cwd: String,
     duration_ms: u64,
+    shell_info: ShellInfo,
+}
+
+fn detect_shell_version() -> String {
+    if let Some(cached) = CACHED_SHELL_VERSION.get() {
+        return cached.clone();
+    }
+
+    let detected = Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$PSVersionTable.PSVersion.ToString()",
+        ])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if raw.is_empty() {
+                    None
+                } else {
+                    Some(raw)
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let _ = CACHED_SHELL_VERSION.set(detected.clone());
+    detected
+}
+
+fn collect_git_info(cwd: &Path) -> Option<GitInfo> {
+    let output = Command::new("git")
+        .args(["status", "--porcelain=v2", "--branch"])
+        .current_dir(cwd)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout).into_owned();
+    let mut branch: Option<String> = None;
+    let mut ahead: u32 = 0;
+    let mut behind: u32 = 0;
+    let mut dirty: u32 = 0;
+
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("# branch.head ") {
+            let trimmed = rest.trim();
+            if !trimmed.is_empty() && trimmed != "(detached)" {
+                branch = Some(trimmed.to_string());
+            }
+        } else if let Some(rest) = line.strip_prefix("# branch.ab ") {
+            let mut parts = rest.split_whitespace();
+            if let Some(part) = parts.next() {
+                ahead = part.trim_start_matches('+').parse().unwrap_or(0);
+            }
+            if let Some(part) = parts.next() {
+                behind = part.trim_start_matches('-').parse().unwrap_or(0);
+            }
+        } else if !line.starts_with('#') && !line.is_empty() {
+            dirty += 1;
+        }
+    }
+
+    Some(GitInfo {
+        branch,
+        dirty,
+        ahead,
+        behind,
+    })
+}
+
+fn home_dir_string() -> Option<String> {
+    std::env::var("USERPROFILE")
+        .ok()
+        .or_else(|| std::env::var("HOME").ok())
+}
+
+fn collect_shell_info(cwd: &Path) -> ShellInfo {
+    ShellInfo {
+        app_version: format!("v{APP_VERSION}"),
+        shell_name: "PowerShell".to_string(),
+        shell_version: detect_shell_version(),
+        cwd: cwd.display().to_string(),
+        home_dir: home_dir_string(),
+        git: collect_git_info(cwd),
+    }
+}
+
+#[tauri::command]
+fn get_shell_info(state: State<'_, ShellState>) -> Result<ShellInfo, String> {
+    let cwd = state
+        .cwd
+        .lock()
+        .map_err(|_| "shell state lock poisoned".to_string())?
+        .clone();
+    Ok(collect_shell_info(&cwd))
 }
 
 #[tauri::command]
@@ -262,6 +390,8 @@ fn run_shell_command(
         *stored_cwd = next_cwd.clone();
     }
 
+    let shell_info = collect_shell_info(&next_cwd);
+
     Ok(CommandResult {
         command,
         stdout,
@@ -269,6 +399,7 @@ fn run_shell_command(
         exit_code: output.status.code().unwrap_or(1),
         cwd: next_cwd.display().to_string(),
         duration_ms,
+        shell_info,
     })
 }
 
@@ -277,7 +408,11 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ShellState::default())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ask_local_llm, run_shell_command])
+        .invoke_handler(tauri::generate_handler![
+            ask_local_llm,
+            run_shell_command,
+            get_shell_info
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

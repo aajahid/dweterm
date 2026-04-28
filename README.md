@@ -6,7 +6,7 @@ The app uses a Warp/Cursor-style block console instead of direct terminal emulat
 
 ## Current Status
 
-The project has its initial Tauri + React + TypeScript scaffold and a first block-based command workspace. Commands run as non-interactive PowerShell executions and render stdout, stderr, exit status, duration, and current working directory as styled blocks. Natural-language prompts render as AI blocks backed by local Ollama.
+The project has a Warp-style command workspace. The window has a slim top toolbar (sidebar/grid toggles, center search, profile area), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive PowerShell executions; each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
 
 ## Prerequisites
 
@@ -60,9 +60,18 @@ npm run dev
 DweTerm renders each submission as a block:
 
 - Shell commands run through `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`.
-- Command blocks show stdout, stderr, exit code, elapsed time, and current working directory.
+- Each block has a Warp-style prompt header showing app version, path (with `~` for the user's home), `git:(branch)`, dirty/ahead/behind counts, and elapsed time.
+- Command blocks show stdout, stderr, exit status, and current working directory.
 - Directory changes such as `cd ..` are tracked for later command blocks.
+- A status bar above the composer shows the live PowerShell version, current path, git branch, and `± N` dirty file count.
 - Interactive terminal programs and full-screen TUIs are outside the current MVP scope.
+
+### Composer Shortcuts
+
+- `Enter` runs the current command or routes natural language to the local AI agent.
+- `Ctrl + Shift + Enter` forces an `/agent` conversation regardless of the input shape.
+- `↑` / `↓` navigates the in-session command history; the partially-typed line is preserved as a draft.
+- `Tab` or `→` (at end of line) accepts the ghost autocomplete suggested from history.
 
 ## AI Prompt Detection
 
