@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
 import { TopBar } from "./components/TopBar";
@@ -29,6 +30,12 @@ function updateBlock(blocks: ConsoleBlock[], nextBlock: ConsoleBlock) {
   return blocks.map((block) => (block.id === nextBlock.id ? nextBlock : block));
 }
 
+type AiStreamChunk = {
+  blockId: string;
+  kind: "thinking" | "response";
+  text: string;
+};
+
 function App() {
   const historyRef = useRef<HTMLDivElement>(null);
   const [blocks, setBlocks] = useState<ConsoleBlock[]>([]);
@@ -44,6 +51,46 @@ function App() {
         setShellInfo(null);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    void (async () => {
+      unlisten = await listen<AiStreamChunk>(
+        "dweterm://ai-stream-chunk",
+        (event) => {
+          const chunk = event.payload;
+          if (!chunk?.blockId || !chunk.text) {
+            return;
+          }
+
+          setBlocks((current) =>
+            current.map((block) => {
+              if (block.kind !== "ai" || block.id !== chunk.blockId) {
+                return block;
+              }
+
+              if (chunk.kind === "thinking") {
+                return {
+                  ...block,
+                  thinking: `${block.thinking ?? ""}${chunk.text}`,
+                };
+              }
+
+              return {
+                ...block,
+                response: `${block.response ?? ""}${chunk.text}`,
+              };
+            }),
+          );
+        },
+      );
+    })();
+
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -73,25 +120,36 @@ function App() {
     const start = performance.now();
 
     try {
-      const response = await invoke<string>("ask_local_llm", { prompt });
+      const response = await invoke<string>("ask_local_llm_stream", {
+        prompt,
+        blockId: block.id,
+      });
       const durationMs = Math.round(performance.now() - start);
       setBlocks((current) =>
-        updateBlock(current, {
-          ...block,
-          status: "success",
-          response,
-          durationMs,
-        }),
+        current.map((entry) =>
+          entry.kind === "ai" && entry.id === block.id
+            ? {
+                ...entry,
+                status: "success",
+                response: response || entry.response,
+                durationMs,
+              }
+            : entry,
+        ),
       );
     } catch (error) {
       const durationMs = Math.round(performance.now() - start);
       setBlocks((current) =>
-        updateBlock(current, {
-          ...block,
-          status: "error",
-          error: String(error),
-          durationMs,
-        }),
+        current.map((entry) =>
+          entry.kind === "ai" && entry.id === block.id
+            ? {
+                ...entry,
+                status: "error",
+                error: String(error),
+                durationMs,
+              }
+            : entry,
+        ),
       );
     }
   };

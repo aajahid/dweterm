@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     process::Command,
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 const CWD_MARKER: &str = "__DWETERM_CWD__";
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,7 +48,25 @@ struct OllamaChatResponse {
 
 #[derive(Deserialize)]
 struct OllamaResponseMessage {
-    content: String,
+    content: Option<String>,
+    thinking: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OllamaChatStreamChunk {
+    message: Option<OllamaResponseMessage>,
+    content: Option<String>,
+    thinking: Option<String>,
+    done: Option<bool>,
+    error: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AiStreamChunkEvent {
+    block_id: String,
+    kind: String,
+    text: String,
 }
 
 struct ShellState {
@@ -143,11 +162,113 @@ fn ask_local_llm_blocking(prompt: String) -> Result<String, String> {
 
     let content = response
         .message
-        .map(|message| message.content.trim().to_string())
+        .and_then(|message| message.content)
+        .map(|content| content.trim().to_string())
         .filter(|content| !content.is_empty())
         .ok_or_else(|| "Ollama returned an empty response".to_string())?;
 
     Ok(content)
+}
+
+fn emit_ai_chunk(
+    app: &AppHandle,
+    block_id: &str,
+    kind: &str,
+    text: &str,
+) -> Result<(), String> {
+    app.emit(
+        "dweterm://ai-stream-chunk",
+        AiStreamChunkEvent {
+            block_id: block_id.to_string(),
+            kind: kind.to_string(),
+            text: text.to_string(),
+        },
+    )
+    .map_err(|error| format!("failed to emit AI stream chunk: {error}"))
+}
+
+fn ask_local_llm_stream_blocking(
+    prompt: String,
+    block_id: String,
+    app: AppHandle,
+) -> Result<String, String> {
+    let config = load_config()?.ollama;
+    let _command_execution_enabled = config.enable_command_execution;
+    let url = format!("{}/api/chat", config.base_url.trim_end_matches('/'));
+    let request = OllamaChatRequest {
+        model: config.model,
+        messages: vec![
+            OllamaChatMessage {
+                role: "system".to_string(),
+                content: config.system_prompt,
+            },
+            OllamaChatMessage {
+                role: "user".to_string(),
+                content: prompt,
+            },
+        ],
+        stream: true,
+    };
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_millis(config.timeout_ms))
+        .build()
+        .map_err(|error| format!("failed to create Ollama client: {error}"))?;
+    let response = client
+        .post(url)
+        .json(&request)
+        .send()
+        .map_err(|error| format!("failed to reach Ollama: {error}"))?;
+    let status = response.status();
+
+    if !status.is_success() {
+        let body = response
+            .text()
+            .map_err(|error| format!("failed to read Ollama error response: {error}"))?;
+        return Err(format!("Ollama returned {status}: {body}"));
+    }
+
+    let mut response_text = String::new();
+    let reader = BufReader::new(response);
+
+    for line in reader.lines() {
+        let line = line.map_err(|error| format!("failed to read Ollama stream chunk: {error}"))?;
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let chunk = serde_json::from_str::<OllamaChatStreamChunk>(trimmed)
+            .map_err(|error| format!("failed to parse Ollama stream chunk: {error}"))?;
+
+        if let Some(error) = chunk.error {
+            return Err(format!("Ollama error: {error}"));
+        }
+
+        let message_thinking = chunk.message.as_ref().and_then(|message| message.thinking.clone());
+        let message_content = chunk.message.as_ref().and_then(|message| message.content.clone());
+        let thinking = chunk.thinking.or(message_thinking);
+        let content = chunk.content.or(message_content);
+
+        if let Some(thinking) = thinking.filter(|value| !value.is_empty()) {
+            emit_ai_chunk(&app, &block_id, "thinking", &thinking)?;
+        }
+
+        if let Some(content) = content.filter(|value| !value.is_empty()) {
+            response_text.push_str(&content);
+            emit_ai_chunk(&app, &block_id, "response", &content)?;
+        }
+
+        if chunk.done.unwrap_or(false) {
+            break;
+        }
+    }
+
+    if response_text.trim().is_empty() {
+        return Err("Ollama returned an empty response".to_string());
+    }
+
+    Ok(response_text.trim().to_string())
 }
 
 impl Default for ShellState {
@@ -307,6 +428,28 @@ async fn ask_local_llm(prompt: String) -> Result<String, String> {
         .map_err(|error| format!("AI request task failed: {error}"))?
 }
 
+#[tauri::command]
+async fn ask_local_llm_stream(
+    app: AppHandle,
+    prompt: String,
+    block_id: String,
+) -> Result<String, String> {
+    let prompt = prompt.trim().to_string();
+    let block_id = block_id.trim().to_string();
+
+    if prompt.is_empty() {
+        return Err("AI prompt is empty".to_string());
+    }
+
+    if block_id.is_empty() {
+        return Err("AI block ID is empty".to_string());
+    }
+
+    tauri::async_runtime::spawn_blocking(move || ask_local_llm_stream_blocking(prompt, block_id, app))
+        .await
+        .map_err(|error| format!("AI request task failed: {error}"))?
+}
+
 fn build_powershell_script(command: &str) -> String {
     format!(
         r#"$global:LASTEXITCODE = $null
@@ -410,6 +553,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             ask_local_llm,
+            ask_local_llm_stream,
             run_shell_command,
             get_shell_info
         ])

@@ -28,7 +28,7 @@ export function ConsoleBlockView({ block }: ConsoleBlockViewProps) {
 
       {block.status === "running" && (
         <p className="block-loading">
-          {command ? "Running command..." : "Thinking via local Ollama..."}
+          {command ? "Running command..." : "Streaming local Ollama response..."}
         </p>
       )}
 
@@ -51,9 +51,22 @@ export function ConsoleBlockView({ block }: ConsoleBlockViewProps) {
         </div>
       )}
 
-      {!command && block.response && (
+      {!command && (block.thinking || block.response) && (
         <div className="block-output">
-          <pre className="block-output-text block-output-ai">{block.response}</pre>
+          {block.thinking ? (
+            <div className="block-ai-thinking">
+              <p className="block-ai-thinking-label">thinking</p>
+              <pre className="block-output-text block-output-ai-thinking">
+                {block.thinking}
+              </pre>
+            </div>
+          ) : null}
+          {block.response ? (
+            <div className="block-ai-answer">
+              <p className="block-ai-answer-label">response</p>
+              <pre className="block-output-text block-output-ai">{block.response}</pre>
+            </div>
+          ) : null}
         </div>
       )}
 

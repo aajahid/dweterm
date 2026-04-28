@@ -80,7 +80,9 @@ DweTerm inspects the submitted input before deciding whether it is a command or 
 - Ordinary shell commands, PowerShell cmdlets, paths, assignments, flags, and command separators run as command blocks.
 - Likely natural-language questions or requests are intercepted and sent to local Ollama.
 - Prefix a line with `ai:` to force AI routing, for example `ai: explain Get-ChildItem`.
-- AI responses render as AI blocks. They are not sent to PowerShell or executed.
+- AI responses stream into AI blocks chunk-by-chunk as they are generated.
+- If the model emits thinking text, DweTerm renders it in a separate "thinking" section from the final response section.
+- AI output is display-only; it is not sent to PowerShell or executed.
 
 ## Build
 

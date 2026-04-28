@@ -344,6 +344,39 @@ button {
   white-space: pre-wrap;
 }
 
+.block-ai-thinking,
+.block-ai-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.block-ai-thinking-label,
+.block-ai-answer-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.block-ai-thinking-label {
+  color: #a5b4fc;
+}
+
+.block-ai-answer-label {
+  color: #fcd34d;
+}
+
+.block-output-ai-thinking {
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.08);
+  border-left: 2px solid rgba(99, 102, 241, 0.4);
+  padding: 10px 14px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+}
+
 .block-empty {
   margin: 0;
   font-family: var(--font-mono);

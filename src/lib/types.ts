@@ -44,6 +44,7 @@ export type AiBlock = {
   startedAt: number;
   durationMs?: number;
   shellSnapshot: ShellInfo | null;
+  thinking?: string;
   response?: string;
   error?: string;
 };

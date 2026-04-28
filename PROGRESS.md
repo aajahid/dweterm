@@ -227,6 +227,26 @@ Files changed:
 - `README.md`
 - `PROGRESS.md`
 
+### 2026-04-29: Streamed AI Chunks with Separate Thinking UI
+
+Implemented chunked AI response streaming and split rendering for thinking vs final answer text.
+
+Reasoning:
+
+- AI output should appear immediately while Ollama is generating, instead of waiting for a full blocking response.
+- Some models expose intermediate thinking tokens; those should be visible in a dedicated area so users can distinguish reasoning traces from final response content.
+- Streaming updates are keyed by block ID and emitted from Tauri as frontend events, allowing multiple AI blocks over time to stay correctly associated with their own chunks.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/lib/types.ts`
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `README.md`
+- `PROGRESS.md`
+
 ## Future Log Template
 
 Use this format for new entries:
