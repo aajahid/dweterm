@@ -247,6 +247,23 @@ Files changed:
 - `README.md`
 - `PROGRESS.md`
 
+### 2026-04-29: Collapsible AI Thinking Section
+
+Updated AI block rendering so model thinking text auto-collapses after streaming finishes and can be manually toggled.
+
+Reasoning:
+
+- Thinking traces are useful but can dominate the block once the final response is available.
+- Auto-collapsing completed thinking keeps history readable while preserving access to details on demand.
+- A visible chevron toggle improves discoverability and gives users explicit control over expansion state.
+
+Files changed:
+
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `README.md`
+- `PROGRESS.md`
+
 ## Future Log Template
 
 Use this format for new entries:

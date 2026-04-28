@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ConsoleBlock, isCommandBlock } from "../lib/types";
 import { PromptHeader } from "./PromptHeader";
 
@@ -7,10 +8,22 @@ type ConsoleBlockViewProps = {
 
 export function ConsoleBlockView({ block }: ConsoleBlockViewProps) {
   const command = isCommandBlock(block);
+  const isAiBlock = block.kind === "ai";
+  const thinkingText = isAiBlock ? block.thinking : undefined;
   const shell = command ? block.result?.shellInfo ?? null : block.shellSnapshot;
   const durationMs = command
     ? block.result?.durationMs
     : block.durationMs;
+  const [isThinkingCollapsed, setIsThinkingCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (!isAiBlock || !thinkingText) {
+      return;
+    }
+    if (block.status !== "running") {
+      setIsThinkingCollapsed(true);
+    }
+  }, [block.status, thinkingText, isAiBlock]);
 
   return (
     <article
@@ -55,10 +68,30 @@ export function ConsoleBlockView({ block }: ConsoleBlockViewProps) {
         <div className="block-output">
           {block.thinking ? (
             <div className="block-ai-thinking">
-              <p className="block-ai-thinking-label">thinking</p>
-              <pre className="block-output-text block-output-ai-thinking">
-                {block.thinking}
-              </pre>
+              <button
+                type="button"
+                className="block-ai-thinking-toggle"
+                onClick={() => setIsThinkingCollapsed((current) => !current)}
+                aria-expanded={!isThinkingCollapsed}
+                aria-label={
+                  isThinkingCollapsed ? "Expand thinking block" : "Collapse thinking block"
+                }
+              >
+                <span
+                  className={`block-ai-thinking-icon ${
+                    isThinkingCollapsed ? "is-collapsed" : ""
+                  }`}
+                  aria-hidden="true"
+                >
+                  ▼
+                </span>
+                <span className="block-ai-thinking-label">thinking</span>
+              </button>
+              {!isThinkingCollapsed && (
+                <pre className="block-output-text block-output-ai-thinking">
+                  {block.thinking}
+                </pre>
+              )}
             </div>
           ) : null}
           {block.response ? (

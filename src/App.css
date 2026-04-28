@@ -351,6 +351,39 @@ button {
   gap: 6px;
 }
 
+.block-ai-thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.block-ai-thinking-toggle:hover .block-ai-thinking-label {
+  color: #c7d2fe;
+}
+
+.block-ai-thinking-toggle:focus-visible {
+  outline: 1px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.block-ai-thinking-icon {
+  color: #a5b4fc;
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.block-ai-thinking-icon.is-collapsed {
+  transform: rotate(-90deg);
+}
+
 .block-ai-thinking-label,
 .block-ai-answer-label {
   margin: 0;

@@ -82,6 +82,7 @@ DweTerm inspects the submitted input before deciding whether it is a command or 
 - Prefix a line with `ai:` to force AI routing, for example `ai: explain Get-ChildItem`.
 - AI responses stream into AI blocks chunk-by-chunk as they are generated.
 - If the model emits thinking text, DweTerm renders it in a separate "thinking" section from the final response section.
+- When AI generation completes, the thinking section auto-collapses; users can expand or collapse it manually with a chevron toggle.
 - AI output is display-only; it is not sent to PowerShell or executed.
 
 ## Build
