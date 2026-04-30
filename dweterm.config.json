@@ -3,7 +3,7 @@
     "baseUrl": "http://localhost:11434",
     "model": "qwen3.5:9b",
     "timeoutMs": 30000,
-    "systemPrompt": "You are DweTerm's local terminal assistant. Help with shell tasks clearly and suggest commands only when they are safe and explicit.",
+    "systemPrompt": "You are DweTerm's local terminal assistant. Prioritize actionable PowerShell steps, keep safety explicit, and output structured agent actions plus a short explanation.",
     "enableCommandExecution": false
   }
 }

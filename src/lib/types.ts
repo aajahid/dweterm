@@ -26,6 +26,57 @@ export type CommandResult = {
 
 export type BlockStatus = "running" | "success" | "error";
 
+export type AgentRisk = "safe" | "caution" | "dangerous";
+
+export type AgentMode = "command" | "clarify" | "explain";
+
+export type AgentStepStatus =
+  | "planned"
+  | "awaiting_confirmation"
+  | "executing"
+  | "completed"
+  | "blocked"
+  | "failed";
+
+export type AgentAction = {
+  id: string;
+  shell: "powershell";
+  command: string;
+  cwd: string | null;
+  risk: AgentRisk;
+  requiresConfirmation: boolean;
+  reason: string;
+  status: AgentStepStatus;
+  result?: CommandResult;
+  error?: string;
+};
+
+export type AgentPlan = {
+  mode: AgentMode;
+  summary: string;
+  commands: AgentAction[];
+  validation: string[];
+  questions: string[];
+  explanation: string;
+  rawJson?: string;
+  parseError?: string;
+};
+
+export type AgentRunStatus =
+  | "none"
+  | "planned"
+  | "running"
+  | "awaiting_confirmation"
+  | "completed"
+  | "failed";
+
+export type AgentRunState = {
+  status: AgentRunStatus;
+  currentStep: number;
+  message?: string;
+  plan?: AgentPlan;
+};
+
 export type CommandBlock = {
   id: string;
   kind: "command";
@@ -46,7 +97,9 @@ export type AiBlock = {
   shellSnapshot: ShellInfo | null;
   thinking?: string;
   response?: string;
+  isWritingCommand?: boolean;
   error?: string;
+  agent?: AgentRunState;
 };
 
 export type ConsoleBlock = CommandBlock | AiBlock;

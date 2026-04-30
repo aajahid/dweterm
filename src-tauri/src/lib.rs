@@ -117,6 +117,40 @@ fn load_config() -> Result<DweTermConfig, String> {
     ))
 }
 
+fn compose_agent_system_prompt(base_prompt: &str) -> String {
+    format!(
+        r#"{base_prompt}
+
+You are operating in DweTerm agent mode. Convert user intent into terminal actions whenever possible.
+
+Response contract:
+1) Always include a machine-readable JSON block between <agent_json> and </agent_json>.
+2) JSON must be a single object with shape:
+{{
+  "mode": "command" | "clarify" | "explain",
+  "summary": "short summary",
+  "commands": [
+    {{
+      "id": "step_1",
+      "shell": "powershell",
+      "command": "command string",
+      "cwd": null,
+      "risk": "safe" | "caution" | "dangerous",
+      "requires_confirmation": true | false,
+      "reason": "why this step exists"
+    }}
+  ],
+  "validation": ["optional validation checks"],
+  "questions": ["only if clarification needed"]
+}}
+
+Safety:
+- Prefer safe read-only commands first.
+- Mark risky operations as caution/dangerous.
+- Never hide risk in explanation text."#
+    )
+}
+
 fn ask_local_llm_blocking(prompt: String) -> Result<String, String> {
     let config = load_config()?.ollama;
     let _command_execution_enabled = config.enable_command_execution;
@@ -126,7 +160,7 @@ fn ask_local_llm_blocking(prompt: String) -> Result<String, String> {
         messages: vec![
             OllamaChatMessage {
                 role: "system".to_string(),
-                content: config.system_prompt,
+                content: compose_agent_system_prompt(&config.system_prompt),
             },
             OllamaChatMessage {
                 role: "user".to_string(),
@@ -200,7 +234,7 @@ fn ask_local_llm_stream_blocking(
         messages: vec![
             OllamaChatMessage {
                 role: "system".to_string(),
-                content: config.system_prompt,
+                content: compose_agent_system_prompt(&config.system_prompt),
             },
             OllamaChatMessage {
                 role: "user".to_string(),

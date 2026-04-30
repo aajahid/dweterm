@@ -83,7 +83,44 @@ DweTerm inspects the submitted input before deciding whether it is a command or 
 - AI responses stream into AI blocks chunk-by-chunk as they are generated.
 - If the model emits thinking text, DweTerm renders it in a separate "thinking" section from the final response section.
 - When AI generation completes, the thinking section auto-collapses; users can expand or collapse it manually with a chevron toggle.
+- The response section now uses the parsed agent plan summary, so no separate `agent_text` envelope is required.
+- While the model is streaming the `agent_json` envelope, AI blocks show an animated loading line that reads `Command is generating` with pulsing dots and a shimmering label.
 - AI output is display-only; it is not sent to PowerShell or executed.
+
+## Warp-Style Agent Loop
+
+DweTerm now supports a structured command-agent loop on AI blocks.
+
+- The backend prompt asks the model for a parseable machine payload (`<agent_json> ... </agent_json>`) only.
+- The frontend parses the payload into an agent plan with ordered PowerShell steps.
+- `safe` steps are auto-executed through the normal command runner.
+- `caution` and `dangerous` steps are held for explicit user approval before execution.
+- If parsing fails or the payload is missing, the block surfaces a parse error note.
+- Command policy is conservative: ambiguous commands are treated as confirmation-required.
+
+### Agent Output Contract
+
+The expected machine payload is:
+
+```json
+{
+  "mode": "command | clarify | explain",
+  "summary": "short summary",
+  "commands": [
+    {
+      "id": "step_1",
+      "shell": "powershell",
+      "command": "string",
+      "cwd": null,
+      "risk": "safe | caution | dangerous",
+      "requires_confirmation": true,
+      "reason": "why this command exists"
+    }
+  ],
+  "validation": [],
+  "questions": []
+}
+```
 
 ## Build
 

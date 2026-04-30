@@ -282,3 +282,99 @@ Files changed:
 
 - `path/to/file`
 ```
+
+### 2026-04-29: Warp-Style Agent Execution Loop
+
+Implemented a structured agent loop that parses AI responses into command plans, auto-runs safe steps, and gates risky steps behind confirmation controls.
+
+Reasoning:
+
+- DweTerm needed a command-first AI path that can be safely executed instead of display-only prose.
+- The model now receives an explicit response envelope contract (`agent_json` + `agent_text`) so frontend parsing is reliable.
+- Risk handling is conservative by default: dangerous/caution patterns require approval; execution failures and parse failures are surfaced in the block UI.
+- The existing command block runner remains the single execution path, so agent actions and manual commands share consistent stdout/stderr/exit behavior.
+
+Files changed:
+
+- `src/lib/types.ts`
+- `src/lib/agentParser.ts`
+- `src/lib/agentPolicy.ts`
+- `src/App.tsx`
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `src-tauri/src/lib.rs`
+- `dweterm.config.json`
+- `README.md`
+- `PLAN.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Response Block Shows Agent Text Only
+
+Updated AI response rendering so the response block only shows content from the Agent Text envelope and never displays surrounding protocol payload text.
+
+Reasoning:
+
+- Streaming previously appended raw model output, which could expose envelope noise beyond the intended user-facing response content.
+- The frontend now extracts only text inside `agent_text` boundaries while streaming and normalizes alternate markers (`TEXT_OPEN` / `TEXT_CLOSE`) to the same envelope behavior.
+- Final block completion now prefers parsed Agent Text content only, keeping the response section focused and predictable.
+
+Files changed:
+
+- `src/App.tsx`
+- `src/lib/agentParser.ts`
+- `src/components/ConsoleBlockView.tsx`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: JSON Streaming Loading State
+
+Added an explicit AI loading state for the command-writing phase while the model streams `agent_json` content.
+
+Reasoning:
+
+- Agent-mode responses stream protocol content first (`agent_json`) before the human-facing `agent_text`, and users need a clear indicator of what the model is doing during that gap.
+- The frontend now tracks this phase per block and shows `Writing the command` while JSON is streaming and before `agent_text` begins.
+- The state turns off automatically once text streaming starts or the AI block completes/errors.
+
+Files changed:
+
+- `src/lib/types.ts`
+- `src/App.tsx`
+- `src/components/ConsoleBlockView.tsx`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Removed Agent Text Envelope
+
+Removed the `agent_text` requirement from the AI contract to reduce unnecessary generation delay and rely on structured payload data only.
+
+Reasoning:
+
+- The extra `agent_text` phase added latency after command JSON generation without adding essential control data.
+- The frontend now surfaces the parsed plan summary as the response label text, so users still get a concise explanation.
+- Stream handling now tracks only `<agent_json>` boundaries for loading-state behavior.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `src/lib/agentParser.ts`
+- `src/App.tsx`
+- `README.md`
+- `PROGRESS.md`
+
+### 2026-04-29: Animated Command-Generating Loading State
+
+Replaced the plain `Writing the command` loading line with an animated indicator while the model streams the `agent_json` envelope.
+
+Reasoning:
+
+- Users had no visual signal that the model was actively generating; a static line is easy to mistake for a stalled stream.
+- The new state renders three pulsing dots plus a shimmering `Command is generating` label, using the existing AI accent color so it reads as part of the agent flow rather than a generic spinner.
+- The cursor-blink `::after` is suppressed for this specific state so the dots remain the single point of motion. Other loading states (running command, plain Ollama streaming) keep the existing blinking-cursor look.
+
+Files changed:
+
+- `src/components/ConsoleBlockView.tsx`
+- `src/App.css`
+- `README.md`
+- `PROGRESS.md`
