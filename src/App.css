@@ -313,6 +313,81 @@ button {
   }
 }
 
+.block-loading-generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-update);
+}
+
+.block-loading-generating::after {
+  content: none;
+}
+
+.block-loading-text {
+  background: linear-gradient(
+    90deg,
+    rgba(245, 158, 11, 0.55) 0%,
+    var(--color-update) 50%,
+    rgba(245, 158, 11, 0.55) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: loading-text-shimmer 2.4s linear infinite;
+}
+
+@keyframes loading-text-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-update);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.55);
+  animation: loading-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.loading-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.loading-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.loading-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes loading-dot-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
 .block-output {
   margin-top: 2px;
   margin-left: 22px;
@@ -349,6 +424,131 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.block-ai-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.block-ai-plan-summary,
+.block-ai-plan-reason,
+.block-ai-plan-note,
+.block-ai-plan-error {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.block-ai-plan-summary {
+  color: var(--color-text-muted);
+}
+
+.block-ai-plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.block-ai-plan-step {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(30, 41, 59, 0.2);
+}
+
+.block-ai-plan-step-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.step-risk,
+.step-status {
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.step-risk-safe {
+  background: rgba(74, 222, 128, 0.15);
+  color: #86efac;
+}
+
+.step-risk-caution {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+}
+
+.step-risk-dangerous {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fda4af;
+}
+
+.step-status-planned,
+.step-status-executing,
+.step-status-completed,
+.step-status-awaiting_confirmation,
+.step-status-blocked,
+.step-status-failed {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--color-text-muted);
+}
+
+.block-ai-plan-command {
+  background: rgba(15, 23, 42, 0.45);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.block-ai-plan-reason {
+  color: var(--color-text-muted);
+}
+
+.block-ai-plan-error {
+  color: var(--color-error);
+}
+
+.block-ai-plan-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.step-action {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  background: rgba(30, 41, 59, 0.35);
+  color: var(--color-text-primary);
+}
+
+.step-action:hover {
+  border-color: var(--color-border-strong);
+}
+
+.step-approve {
+  color: #86efac;
+}
+
+.step-reject {
+  color: #fda4af;
+}
+
+.block-ai-plan-note {
+  color: var(--color-text-faint);
 }
 
 .block-ai-thinking-toggle {
