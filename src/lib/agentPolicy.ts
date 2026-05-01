@@ -1,3 +1,4 @@
+import { getShellProfile, type ShellKey } from "./shells";
 import { AgentAction, AgentRisk } from "./types";
 
 type PolicyResult = {
@@ -6,44 +7,22 @@ type PolicyResult = {
   denialReason?: string;
 };
 
-const dangerousPatterns = [
-  /\brm\b/i,
-  /\bremove-item\b/i,
-  /\bdel\b/i,
-  /\brmdir\b/i,
-  /\bformat-volume\b/i,
-  /\bformat\b/i,
-  /\bshutdown\b/i,
-  /\bstop-process\b/i,
-  /\btaskkill\b/i,
-  /\bgit\s+reset\s+--hard\b/i,
-  /\breg\s+(add|delete)\b/i,
-];
-
-const cautionPatterns = [
-  /\bmove-item\b/i,
-  /\bcopy-item\b/i,
-  /\brename-item\b/i,
-  /\bgit\s+(clean|checkout|restore)\b/i,
-  /\bnew-item\b/i,
-  /\bset-content\b/i,
-  /\binvoke-webrequest\b/i,
-  /\bcurl\b/i,
-  /\bwinget\s+install\b/i,
-];
-
-function classifyRisk(command: string): AgentRisk {
-  if (dangerousPatterns.some((pattern) => pattern.test(command))) {
+function classifyRisk(command: string, shellKey: ShellKey | null | undefined): AgentRisk {
+  const profile = getShellProfile(shellKey);
+  if (profile.dangerousPatterns.some((pattern) => pattern.test(command))) {
     return "dangerous";
   }
-  if (cautionPatterns.some((pattern) => pattern.test(command))) {
+  if (profile.cautionPatterns.some((pattern) => pattern.test(command))) {
     return "caution";
   }
   return "safe";
 }
 
-export function applyPolicy(action: AgentAction): PolicyResult {
-  const policyRisk = classifyRisk(action.command);
+export function applyPolicy(
+  action: AgentAction,
+  shellKey: ShellKey | null | undefined,
+): PolicyResult {
+  const policyRisk = classifyRisk(action.command, shellKey);
   const mergedRisk: AgentRisk =
     action.risk === "dangerous" || policyRisk === "dangerous"
       ? "dangerous"

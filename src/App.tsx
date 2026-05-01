@@ -24,6 +24,7 @@ import {
 } from "./lib/types";
 import { parseAgentResponse } from "./lib/agentParser";
 import { applyPolicy } from "./lib/agentPolicy";
+import { DEFAULT_SHELL_KEY } from "./lib/shells";
 
 function createBlockId() {
   return crypto.randomUUID();
@@ -156,8 +157,9 @@ function App() {
   };
 
   const initializeAgentState = (plan: AgentPlan): AgentPlan => {
+    const shellKey = shellInfo?.shellKey ?? DEFAULT_SHELL_KEY;
     const commands = plan.commands.map((action) => {
-      const policy = applyPolicy(action);
+      const policy = applyPolicy(action, shellKey);
       if (policy.denied) {
         return {
           ...policy.action,
@@ -436,7 +438,8 @@ function App() {
           : `${AI_PREFIX} ${trimmed}`
         : trimmed;
 
-      if (options.forceAi || looksLikeNaturalLanguage(forced)) {
+      const shellKey = shellInfo?.shellKey ?? DEFAULT_SHELL_KEY;
+      if (options.forceAi || looksLikeNaturalLanguage(forced, shellKey)) {
         await runAiPrompt(forced);
       } else {
         await runCommand(forced);

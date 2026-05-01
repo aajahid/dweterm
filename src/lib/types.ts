@@ -1,3 +1,5 @@
+import type { ShellKey } from "./shells";
+
 export type GitInfo = {
   branch: string | null;
   dirty: number;
@@ -8,7 +10,9 @@ export type GitInfo = {
 export type ShellInfo = {
   appVersion: string;
   shellName: string;
+  shellKey: ShellKey;
   shellVersion: string;
+  pathSeparator: string;
   cwd: string;
   homeDir: string | null;
   git: GitInfo | null;
@@ -40,7 +44,7 @@ export type AgentStepStatus =
 
 export type AgentAction = {
   id: string;
-  shell: "powershell";
+  shell: ShellKey;
   command: string;
   cwd: string | null;
   risk: AgentRisk;

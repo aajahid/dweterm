@@ -378,3 +378,45 @@ Files changed:
 - `src/App.css`
 - `README.md`
 - `PROGRESS.md`
+
+### 2026-04-30: Linux/Bash Support and Platform Split
+
+Added Linux/Bash host shell support alongside the existing Windows/PowerShell flow and reorganized the codebase so each platform owns its shell integration in isolation.
+
+Reasoning:
+
+- The product needs to run on Linux without giving up the Windows path. We picked Bash as the Linux default to match the user's "bash for Linux, PowerShell for Windows" decision.
+- The Rust backend now uses `#[cfg(target_os = ...)]` to compile only the active platform's shell module, so the release binary never ships the other platform's shell code. This honors the "platform-specific code in only at build time" goal.
+- The new `src-tauri/src/shell/` module defines a shared surface (`SHELL_NAME`, `SHELL_KEY`, `PATH_SEPARATOR`, `detect_version`, `home_dir`, `run`) that each platform implements (`windows.rs`, `linux.rs`). Cross-platform helpers (`git.rs`, `split_stdout_and_cwd`, `RunOutput`) live in `mod.rs` so platform modules stay focused.
+- Bash invocation uses `bash -c <script>` with an `EXIT` trap that prints the `__DWETERM_CWD__` marker so cwd tracking still works even when the user command calls `exit`. This mirrors the PowerShell `try/finally` behavior.
+- The frontend keeps shell metadata in a parallel structure under `src/lib/shells/` (`powershell.ts`, `bash.ts`, `index.ts`, `types.ts`). Command starters, dangerous/caution risk regex lists, and the path separator used for prompt headers all live in those profiles. `applyPolicy`, `looksLikeShellCommand`, and `looksLikeNaturalLanguage` now take a `ShellKey` argument so the frontend dispatches per shell.
+- `ShellInfo` (returned by `get_shell_info` / `run_shell_command`) now carries `shellKey` and `pathSeparator` so the frontend has one source of truth and does not hardcode Windows path separators.
+- The agent system prompt is composed from a shell-neutral base in `dweterm.config.json` plus a Rust-side wrapper that injects the active shell key, so the model only emits commands for the host shell.
+- Rationale for runtime dispatch on the frontend even though the Rust side is compile-time gated: the future "user picks a custom console" feature will require multiple shells to coexist in the JS bundle anyway, and the per-profile JS payload is tiny.
+
+Alternatives rejected:
+
+- Vite-side compile-time stripping of unused shell profiles. The size win was negligible and the bundler complexity would have to be undone again the moment the user-selectable console feature lands.
+- Single Rust shell module with runtime branches. Cleaner cfg-gated modules give us guaranteed binary-size wins and a clear seam for the future shell registry.
+
+Files changed:
+
+- `src-tauri/src/shell/mod.rs` (new)
+- `src-tauri/src/shell/git.rs` (new)
+- `src-tauri/src/shell/windows.rs` (new)
+- `src-tauri/src/shell/linux.rs` (new)
+- `src-tauri/src/lib.rs`
+- `src/lib/shells/types.ts` (new)
+- `src/lib/shells/powershell.ts` (new)
+- `src/lib/shells/bash.ts` (new)
+- `src/lib/shells/index.ts` (new)
+- `src/lib/types.ts`
+- `src/lib/agentParser.ts`
+- `src/lib/agentPolicy.ts`
+- `src/lib/detectInputKind.ts`
+- `src/lib/format.ts`
+- `src/App.tsx`
+- `dweterm.config.json`
+- `README.md`
+- `PLAN.md`
+- `PROGRESS.md`

@@ -1,9 +1,9 @@
 {
   "ollama": {
-    "baseUrl": "http://localhost:11434",
+    "baseUrl": "http://hesperus.tailfccf9f.ts.net:11434",
     "model": "qwen3.5:9b",
     "timeoutMs": 30000,
-    "systemPrompt": "You are DweTerm's local terminal assistant. Prioritize actionable PowerShell steps, keep safety explicit, and output structured agent actions plus a short explanation.",
+    "systemPrompt": "You are DweTerm's local terminal assistant. Prioritize actionable shell steps for the host's default shell, keep safety explicit, and output structured agent actions plus a short explanation.",
     "enableCommandExecution": false
   }
 }
