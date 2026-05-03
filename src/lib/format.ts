@@ -11,9 +11,10 @@ export function formatDuration(durationMs: number) {
 export function formatPromptPath(shell: ShellInfo | null | undefined): string {
   if (!shell) return "~";
   const cwd = shell.cwd;
+  const sep = shell.pathSeparator || "/";
   if (shell.homeDir && cwd.toLowerCase().startsWith(shell.homeDir.toLowerCase())) {
     const tail = cwd.slice(shell.homeDir.length).replace(/^[\\/]/, "");
-    return tail ? `~\\${tail}` : "~";
+    return tail ? `~${sep}${tail}` : "~";
   }
   return cwd;
 }

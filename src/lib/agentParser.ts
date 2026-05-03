@@ -1,3 +1,4 @@
+import { normalizeShellKey } from "./shells";
 import { AgentAction, AgentMode, AgentPlan, AgentRisk } from "./types";
 
 type ParsedEnvelope = {
@@ -48,7 +49,7 @@ function normalizeAction(value: unknown, index: number): AgentAction | null {
   const raw = value as Record<string, unknown>;
   const command = typeof raw.command === "string" ? raw.command.trim() : "";
   if (!command) return null;
-  const shell = raw.shell === "powershell" ? "powershell" : "powershell";
+  const shell = normalizeShellKey(raw.shell);
   const id =
     typeof raw.id === "string" && raw.id.trim()
       ? raw.id.trim()

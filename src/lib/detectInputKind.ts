@@ -1,58 +1,6 @@
+import { getShellProfile, type ShellKey } from "./shells";
+
 export const AI_PREFIX = "ai:";
-
-const shellCommandStarters = new Set([
-  "cat",
-  "cd",
-  "clear",
-  "cls",
-  "code",
-  "copy",
-  "cp",
-  "cargo",
-  "del",
-  "dir",
-  "docker",
-  "docker-compose",
-  "echo",
-  "exit",
-  "git",
-  "grep",
-  "ls",
-  "mkdir",
-  "move",
-  "mv",
-  "node",
-  "npm",
-  "ollama",
-  "pnpm",
-  "powershell",
-  "pwd",
-  "py",
-  "python",
-  "rm",
-  "rmdir",
-  "rustup",
-  "tauri",
-  "type",
-  "where",
-  "winget",
-  "yarn",
-]);
-
-const powershellVerbStarters = [
-  "add-",
-  "clear-",
-  "copy-",
-  "get-",
-  "move-",
-  "new-",
-  "remove-",
-  "select-",
-  "set-",
-  "start-",
-  "stop-",
-  "write-",
-];
 
 const naturalLanguageStarters = [
   "can you",
@@ -87,25 +35,32 @@ export function stripAiPrefix(input: string) {
     : trimmed;
 }
 
-export function looksLikeShellCommand(input: string) {
+export function looksLikeShellCommand(
+  input: string,
+  shellKey: ShellKey | null | undefined,
+) {
+  const profile = getShellProfile(shellKey);
   const trimmed = input.trim();
   const lower = trimmed.toLowerCase();
   const firstToken = lower.split(/\s+/, 1)[0] ?? "";
 
   return (
-    shellCommandStarters.has(firstToken) ||
-    powershellVerbStarters.some((starter) => firstToken.startsWith(starter)) ||
+    profile.commandStarters.has(firstToken) ||
+    profile.commandStarterPrefixes.some((starter) => firstToken.startsWith(starter)) ||
     /^[.$]?\w+\s*=/.test(trimmed) ||
     /^[.~]?[\\/]/.test(trimmed) ||
     /^\.{1,2}[\\/]/.test(trimmed) ||
     /^[&|<>]/.test(trimmed) ||
     /(?:&&|\|\||[|;<>])/.test(trimmed) ||
-    /^\S+\.(?:exe|ps1|bat|cmd)(?:\s|$)/i.test(trimmed) ||
+    /^\S+\.(?:exe|ps1|bat|cmd|sh)(?:\s|$)/i.test(trimmed) ||
     /^\S+\s+-{1,2}\S+/.test(trimmed)
   );
 }
 
-export function looksLikeNaturalLanguage(input: string) {
+export function looksLikeNaturalLanguage(
+  input: string,
+  shellKey: ShellKey | null | undefined,
+) {
   const trimmed = input.trim();
   const lower = trimmed.toLowerCase();
 
@@ -117,7 +72,7 @@ export function looksLikeNaturalLanguage(input: string) {
     return stripAiPrefix(trimmed).length > 0;
   }
 
-  if (looksLikeShellCommand(trimmed)) {
+  if (looksLikeShellCommand(trimmed, shellKey)) {
     return false;
   }
 

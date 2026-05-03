@@ -3,13 +3,15 @@ use std::{
     fs,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::Command,
-    sync::{Mutex, OnceLock},
+    sync::Mutex,
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, State};
 
-const CWD_MARKER: &str = "__DWETERM_CWD__";
+mod shell;
+
+use shell::{platform, CommandResult, ShellInfo};
+
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Deserialize)]
@@ -73,8 +75,6 @@ struct ShellState {
     cwd: Mutex<PathBuf>,
 }
 
-static CACHED_SHELL_VERSION: OnceLock<String> = OnceLock::new();
-
 fn config_candidates() -> Result<Vec<PathBuf>, String> {
     let current_dir = std::env::current_dir()
         .map_err(|error| format!("failed to read current directory: {error}"))?;
@@ -118,10 +118,12 @@ fn load_config() -> Result<DweTermConfig, String> {
 }
 
 fn compose_agent_system_prompt(base_prompt: &str) -> String {
+    let shell_key = platform::SHELL_KEY;
+    let shell_name = platform::SHELL_NAME;
     format!(
         r#"{base_prompt}
 
-You are operating in DweTerm agent mode. Convert user intent into terminal actions whenever possible.
+You are operating in DweTerm agent mode. The host shell is {shell_name} (shell key: "{shell_key}"). Convert user intent into terminal actions whenever possible.
 
 Response contract:
 1) Always include a machine-readable JSON block between <agent_json> and </agent_json>.
@@ -132,7 +134,7 @@ Response contract:
   "commands": [
     {{
       "id": "step_1",
-      "shell": "powershell",
+      "shell": "{shell_key}",
       "command": "command string",
       "cwd": null,
       "risk": "safe" | "caution" | "dangerous",
@@ -147,7 +149,8 @@ Response contract:
 Safety:
 - Prefer safe read-only commands first.
 - Mark risky operations as caution/dangerous.
-- Never hide risk in explanation text."#
+- Never hide risk in explanation text.
+- Only emit commands for the host shell ({shell_name})."#
     )
 }
 
@@ -313,129 +316,16 @@ impl Default for ShellState {
     }
 }
 
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct GitInfo {
-    branch: Option<String>,
-    dirty: u32,
-    ahead: u32,
-    behind: u32,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct ShellInfo {
-    app_version: String,
-    shell_name: String,
-    shell_version: String,
-    cwd: String,
-    home_dir: Option<String>,
-    git: Option<GitInfo>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CommandResult {
-    command: String,
-    stdout: String,
-    stderr: String,
-    exit_code: i32,
-    cwd: String,
-    duration_ms: u64,
-    shell_info: ShellInfo,
-}
-
-fn detect_shell_version() -> String {
-    if let Some(cached) = CACHED_SHELL_VERSION.get() {
-        return cached.clone();
-    }
-
-    let detected = Command::new("powershell.exe")
-        .args([
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "$PSVersionTable.PSVersion.ToString()",
-        ])
-        .output()
-        .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if raw.is_empty() {
-                    None
-                } else {
-                    Some(raw)
-                }
-            } else {
-                None
-            }
-        })
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let _ = CACHED_SHELL_VERSION.set(detected.clone());
-    detected
-}
-
-fn collect_git_info(cwd: &Path) -> Option<GitInfo> {
-    let output = Command::new("git")
-        .args(["status", "--porcelain=v2", "--branch"])
-        .current_dir(cwd)
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    let text = String::from_utf8_lossy(&output.stdout).into_owned();
-    let mut branch: Option<String> = None;
-    let mut ahead: u32 = 0;
-    let mut behind: u32 = 0;
-    let mut dirty: u32 = 0;
-
-    for line in text.lines() {
-        if let Some(rest) = line.strip_prefix("# branch.head ") {
-            let trimmed = rest.trim();
-            if !trimmed.is_empty() && trimmed != "(detached)" {
-                branch = Some(trimmed.to_string());
-            }
-        } else if let Some(rest) = line.strip_prefix("# branch.ab ") {
-            let mut parts = rest.split_whitespace();
-            if let Some(part) = parts.next() {
-                ahead = part.trim_start_matches('+').parse().unwrap_or(0);
-            }
-            if let Some(part) = parts.next() {
-                behind = part.trim_start_matches('-').parse().unwrap_or(0);
-            }
-        } else if !line.starts_with('#') && !line.is_empty() {
-            dirty += 1;
-        }
-    }
-
-    Some(GitInfo {
-        branch,
-        dirty,
-        ahead,
-        behind,
-    })
-}
-
-fn home_dir_string() -> Option<String> {
-    std::env::var("USERPROFILE")
-        .ok()
-        .or_else(|| std::env::var("HOME").ok())
-}
-
 fn collect_shell_info(cwd: &Path) -> ShellInfo {
     ShellInfo {
         app_version: format!("v{APP_VERSION}"),
-        shell_name: "PowerShell".to_string(),
-        shell_version: detect_shell_version(),
+        shell_name: platform::SHELL_NAME.to_string(),
+        shell_key: platform::SHELL_KEY.to_string(),
+        shell_version: platform::detect_version(),
+        path_separator: platform::PATH_SEPARATOR.to_string(),
         cwd: cwd.display().to_string(),
-        home_dir: home_dir_string(),
-        git: collect_git_info(cwd),
+        home_dir: platform::home_dir(),
+        git: shell::git::collect_git_info(cwd),
     }
 }
 
@@ -484,46 +374,6 @@ async fn ask_local_llm_stream(
         .map_err(|error| format!("AI request task failed: {error}"))?
 }
 
-fn build_powershell_script(command: &str) -> String {
-    format!(
-        r#"$global:LASTEXITCODE = $null
-try {{
-  & {{
-{command}
-  }}
-  $dwetermSucceeded = $?
-  $dwetermNativeExitCode = $global:LASTEXITCODE
-  if ($null -ne $dwetermNativeExitCode) {{
-    $dwetermExitCode = [int]$dwetermNativeExitCode
-  }} elseif ($dwetermSucceeded) {{
-    $dwetermExitCode = 0
-  }} else {{
-    $dwetermExitCode = 1
-  }}
-}} catch {{
-  Write-Error $_
-  $dwetermExitCode = 1
-}} finally {{
-  Write-Output "`n{CWD_MARKER}$((Get-Location).ProviderPath)"
-}}
-exit $dwetermExitCode"#
-    )
-}
-
-fn split_stdout_and_cwd(stdout: String) -> (String, Option<PathBuf>) {
-    let mut lines = stdout.lines().map(str::to_string).collect::<Vec<_>>();
-    let cwd = lines
-        .iter()
-        .rposition(|line| line.starts_with(CWD_MARKER))
-        .map(|index| {
-            let line = lines.remove(index);
-            PathBuf::from(line.trim_start_matches(CWD_MARKER).trim())
-        });
-    let cleaned_stdout = lines.join("\n");
-
-    (cleaned_stdout, cwd)
-}
-
 #[tauri::command]
 fn run_shell_command(
     state: State<'_, ShellState>,
@@ -540,24 +390,11 @@ fn run_shell_command(
         .lock()
         .map_err(|_| "shell state lock poisoned".to_string())?
         .clone();
-    let script = build_powershell_script(&command);
     let started_at = Instant::now();
-    let output = Command::new("powershell.exe")
-        .args([
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            &script,
-        ])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|error| format!("failed to run PowerShell command: {error}"))?;
+    let output = platform::run(&cwd, &command)
+        .map_err(|error| format!("failed to run {} command: {error}", platform::SHELL_NAME))?;
     let duration_ms = started_at.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let (stdout, next_cwd) = split_stdout_and_cwd(stdout);
-    let next_cwd = next_cwd.unwrap_or(cwd);
+    let next_cwd = output.next_cwd.unwrap_or(cwd);
 
     {
         let mut stored_cwd = state
@@ -571,9 +408,9 @@ fn run_shell_command(
 
     Ok(CommandResult {
         command,
-        stdout,
-        stderr,
-        exit_code: output.status.code().unwrap_or(1),
+        stdout: output.stdout,
+        stderr: output.stderr,
+        exit_code: output.exit_code,
         cwd: next_cwd.display().to_string(),
         duration_ms,
         shell_info,
