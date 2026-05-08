@@ -44,6 +44,28 @@ The app should favor React-rendered command and AI blocks, custom input styling,
 
 ## Progress Log
 
+### 2026-05-08: macOS/Zsh Platform Support
+
+Added macOS host support using Zsh while preserving the compile-time platform split used by Windows and Linux.
+
+Reasoning:
+
+- The project already isolated per-platform shell code (`src-tauri/src/shell/<os>.rs`) and per-shell frontend profiles (`src/lib/shells/<key>.ts`), so macOS support should follow the same seam instead of introducing special runtime branches.
+- The backend now compiles a dedicated macOS shell module that executes commands with `zsh -c`, detects Zsh version, and preserves cwd tracking via the existing `__DWETERM_CWD__` marker flow.
+- The frontend now recognizes a `zsh` shell key and routes command detection/risk policy through a new Zsh shell profile.
+- Project docs now mark macOS as supported and document macOS prerequisites/behavior.
+
+Files changed:
+
+- `src-tauri/src/shell/mod.rs`
+- `src-tauri/src/shell/macos.rs`
+- `src/lib/shells/types.ts`
+- `src/lib/shells/index.ts`
+- `src/lib/shells/zsh.ts`
+- `README.md`
+- `PLAN.md`
+- `PROGRESS.md`
+
 ### 2026-04-28: Initial Documentation
 
 Created initial project documentation plan for:

@@ -1,12 +1,12 @@
 # DweTerm
 
-DweTerm is an AI-aware command workspace built with Tauri, React, and TypeScript. It runs the host's default shell (PowerShell on Windows, Bash on Linux) for command execution and uses a local Ollama model for AI prompts.
+DweTerm is an AI-aware command workspace built with Tauri, React, and TypeScript. It runs the host's default shell (PowerShell on Windows, Bash on Linux, Zsh on macOS) for command execution and uses a local Ollama model for AI prompts.
 
 The app uses a Warp/Cursor-style block console instead of direct terminal emulation. React owns the command input and output rendering, while the Tauri backend runs non-interactive shell commands and sends natural-language prompts to a configured local Ollama model.
 
 ## Current Status
 
-The project has a Warp-style command workspace. The window has a slim top toolbar (sidebar/grid toggles, center search, profile area), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive executions of the host shell (PowerShell on Windows, Bash on Linux); each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
+The project has a Warp-style command workspace. The window has a slim top toolbar (sidebar/grid toggles, center search, profile area), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive executions of the host shell (PowerShell on Windows, Bash on Linux, Zsh on macOS); each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
 
 ## Supported Platforms
 
@@ -16,7 +16,7 @@ DweTerm is built for desktop and detects the host platform at compile time. Each
 | --- | --- | --- |
 | Windows 10/11 | PowerShell | Supported |
 | Linux (Arch, Ubuntu, Fedora, etc.) | Bash | Supported |
-| macOS | Zsh / Bash | Planned |
+| macOS | Zsh | Supported |
 
 User-selectable consoles are not implemented yet; the codebase is organized so a runtime shell registry can be added without changing call sites.
 
@@ -47,6 +47,12 @@ Common to every platform:
   - `librsvg2-dev`
   - `build-essential` / equivalent toolchain (`gcc`, `make`, `pkg-config`).
 
+### macOS
+
+- Zsh (ships with macOS).
+- Xcode Command Line Tools (`xcode-select --install`) so Rust crates with native toolchains can compile.
+- Tauri macOS prerequisites from the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/), including an up-to-date Xcode/macOS SDK.
+
 DweTerm is intentionally developed host-native for the desktop workflow. Tauri needs access to native windowing, the platform webview, and host shell processes.
 
 ## Setup
@@ -74,7 +80,7 @@ On Linux, install the system libraries listed in the Linux prerequisites section
 
 ## Run In Development
 
-Start the desktop app (works on Windows and Linux):
+Start the desktop app (works on Windows, Linux, and macOS):
 
 ```bash
 npm run tauri dev
@@ -93,6 +99,7 @@ DweTerm renders each submission as a block:
 - Shell commands run through the host's default shell:
   - Windows: `powershell.exe -NoLogo -NoProfile -NonInteractive -Command <script>`.
   - Linux: `bash -c <script>` (no profile sourced).
+  - macOS: `zsh -c <script>` (no profile sourced).
 - Each block has a Warp-style prompt header showing app version, path (with `~` for the user's home), `git:(branch)`, dirty/ahead/behind counts, and elapsed time.
 - Command blocks show stdout, stderr, exit status, and current working directory.
 - Directory changes such as `cd ..` are tracked for later command blocks (each platform appends a `__DWETERM_CWD__` marker after the user command so the host can re-anchor cwd).
@@ -101,8 +108,8 @@ DweTerm renders each submission as a block:
 
 ### Platform-Aware Architecture
 
-- The Rust backend uses `#[cfg(target_os = ...)]` to compile only the host platform's shell module. `src-tauri/src/shell/windows.rs` and `src-tauri/src/shell/linux.rs` expose the same surface (`SHELL_NAME`, `SHELL_KEY`, `detect_version`, `home_dir`, `run`) so the rest of the backend is platform-agnostic. Cross-platform helpers (git status parsing, cwd marker handling) live in `src-tauri/src/shell/mod.rs` and `src-tauri/src/shell/git.rs`.
-- The frontend keeps per-shell metadata under `src/lib/shells/` (`powershell.ts`, `bash.ts`) and dispatches via `ShellInfo.shellKey` returned by the backend. Command starter lists, dangerous/caution risk patterns, and the path separator used in prompt headers all live in those profiles.
+- The Rust backend uses `#[cfg(target_os = ...)]` to compile only the host platform's shell module. `src-tauri/src/shell/windows.rs`, `src-tauri/src/shell/linux.rs`, and `src-tauri/src/shell/macos.rs` expose the same surface (`SHELL_NAME`, `SHELL_KEY`, `detect_version`, `home_dir`, `run`) so the rest of the backend is platform-agnostic. Cross-platform helpers (git status parsing, cwd marker handling) live in `src-tauri/src/shell/mod.rs` and `src-tauri/src/shell/git.rs`.
+- The frontend keeps per-shell metadata under `src/lib/shells/` (`powershell.ts`, `bash.ts`, `zsh.ts`) and dispatches via `ShellInfo.shellKey` returned by the backend. Command starter lists, dangerous/caution risk patterns, and the path separator used in prompt headers all live in those profiles.
 - This split keeps each release binary free of the other platform's shell integration while leaving an obvious seam for a future "user-selectable console" feature: replace the cfg-only re-export in `shell/mod.rs` with a registry indexed by user choice, and add new `src/lib/shells/<key>.ts` profiles.
 
 ### Composer Shortcuts
@@ -116,7 +123,7 @@ DweTerm renders each submission as a block:
 
 DweTerm inspects the submitted input before deciding whether it is a command or an AI prompt.
 
-- Ordinary shell commands (PowerShell cmdlets on Windows, bash builtins/utilities on Linux), paths, assignments, flags, and command separators run as command blocks.
+- Ordinary shell commands (PowerShell cmdlets on Windows, bash builtins/utilities on Linux, zsh utilities on macOS), paths, assignments, flags, and command separators run as command blocks.
 - Likely natural-language questions or requests are intercepted and sent to local Ollama.
 - Prefix a line with `ai:` to force AI routing, for example `ai: explain Get-ChildItem` on Windows or `ai: explain ls -al` on Linux.
 - AI responses stream into AI blocks chunk-by-chunk as they are generated.
@@ -131,7 +138,7 @@ DweTerm inspects the submitted input before deciding whether it is a command or 
 DweTerm now supports a structured command-agent loop on AI blocks.
 
 - The backend prompt asks the model for a parseable machine payload (`<agent_json> ... </agent_json>`) only.
-- The backend injects the active shell key (`powershell` on Windows, `bash` on Linux) into the prompt so the model only emits commands the host can run.
+- The backend injects the active shell key (`powershell` on Windows, `bash` on Linux, `zsh` on macOS) into the prompt so the model only emits commands the host can run.
 - The frontend parses the payload into an agent plan with ordered shell steps for the active shell.
 - `safe` steps are auto-executed through the normal command runner.
 - `caution` and `dangerous` steps are held for explicit user approval before execution. Risk patterns are loaded from the active shell profile in `src/lib/shells/`.
@@ -149,7 +156,7 @@ The expected machine payload is:
   "commands": [
     {
       "id": "step_1",
-      "shell": "powershell | bash",
+      "shell": "powershell | bash | zsh",
       "command": "string",
       "cwd": null,
       "risk": "safe | caution | dangerous",

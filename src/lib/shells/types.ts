@@ -1,4 +1,4 @@
-export type ShellKey = "powershell" | "bash";
+export type ShellKey = "powershell" | "bash" | "zsh";
 
 export type ShellProfile = {
   key: ShellKey;

@@ -13,6 +13,11 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub use self::linux as platform;
 
+#[cfg(target_os = "macos")]
+pub mod macos;
+#[cfg(target_os = "macos")]
+pub use self::macos as platform;
+
 pub const CWD_MARKER: &str = "__DWETERM_CWD__";
 
 #[derive(Serialize, Clone)]

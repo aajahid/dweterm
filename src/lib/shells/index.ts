@@ -1,5 +1,6 @@
 import { bashProfile } from "./bash";
 import { powershellProfile } from "./powershell";
+import { zshProfile } from "./zsh";
 import type { ShellKey, ShellProfile } from "./types";
 
 export type { ShellKey, ShellProfile } from "./types";
@@ -7,12 +8,13 @@ export type { ShellKey, ShellProfile } from "./types";
 const profiles: Record<ShellKey, ShellProfile> = {
   powershell: powershellProfile,
   bash: bashProfile,
+  zsh: zshProfile,
 };
 
 export const DEFAULT_SHELL_KEY: ShellKey = "powershell";
 
 export function isShellKey(value: unknown): value is ShellKey {
-  return value === "powershell" || value === "bash";
+  return value === "powershell" || value === "bash" || value === "zsh";
 }
 
 export function normalizeShellKey(value: unknown): ShellKey {
