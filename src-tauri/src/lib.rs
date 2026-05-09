@@ -29,6 +29,8 @@ struct OllamaConfig {
     timeout_ms: u64,
     system_prompt: String,
     enable_command_execution: bool,
+    #[serde(default = "default_enable_thinking")]
+    enable_thinking: bool,
 }
 
 #[derive(Serialize)]
@@ -36,6 +38,7 @@ struct OllamaChatRequest {
     model: String,
     messages: Vec<OllamaChatMessage>,
     stream: bool,
+    think: bool,
 }
 
 #[derive(Serialize)]
@@ -75,6 +78,10 @@ struct AiStreamChunkEvent {
 
 struct ShellState {
     cwd: Mutex<PathBuf>,
+}
+
+fn default_enable_thinking() -> bool {
+    true
 }
 
 fn config_candidates() -> Result<Vec<PathBuf>, String> {
@@ -210,6 +217,7 @@ fn ask_local_llm_blocking(prompt: String) -> Result<String, String> {
             },
         ],
         stream: false,
+        think: config.enable_thinking,
     };
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_millis(config.timeout_ms))
@@ -284,6 +292,7 @@ fn ask_local_llm_stream_blocking(
             },
         ],
         stream: true,
+        think: config.enable_thinking,
     };
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_millis(config.timeout_ms))

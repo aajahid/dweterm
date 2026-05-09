@@ -129,6 +129,7 @@ DweTerm inspects the submitted input before deciding whether it is a command or 
 - AI responses stream into AI blocks chunk-by-chunk as they are generated.
 - If the model emits thinking text, DweTerm renders it in a separate "thinking" section from the final response section.
 - When AI generation completes, the thinking section auto-collapses; users can expand or collapse it manually with a chevron toggle.
+- Set `ollama.enableThinking` in the user config file to toggle whether DweTerm requests model thinking output (`true`) or asks Ollama for non-thinking responses (`false`).
 - The response section now uses the parsed agent plan summary, so no separate `agent_text` envelope is required.
 - While the model is streaming the `agent_json` envelope, AI blocks show an animated loading line that reads `Command is generating` with pulsing dots and a shimmering label.
 - AI output is display-only; it is not sent to the host shell or executed.
@@ -213,7 +214,8 @@ Default config shape:
     "model": "llama3.2",
     "timeoutMs": 30000,
     "systemPrompt": "You are DweTerm's local terminal assistant. Prioritize actionable shell steps for the host's default shell, keep safety explicit, and output structured agent actions plus a short explanation.",
-    "enableCommandExecution": false
+    "enableCommandExecution": false,
+    "enableThinking": true
   }
 }
 ```

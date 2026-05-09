@@ -44,6 +44,24 @@ The app should favor React-rendered command and AI blocks, custom input styling,
 
 ## Progress Log
 
+### 2026-05-09: Config Toggle for Thinking vs Non-Thinking LLM Requests
+
+Added a user-configurable switch that controls whether DweTerm asks Ollama for thinking output.
+
+Reasoning:
+
+- Thinking-capable models can add noticeable response latency; users need a fast toggle without rebuilding the app.
+- The config now supports `ollama.enableThinking`, and both blocking and streaming chat requests pass that value into the Ollama payload via the `think` field.
+- Backward compatibility is preserved for existing user config files by defaulting missing `enableThinking` to `true`.
+- README and default config examples now document the new toggle.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `dweterm.config.json`
+- `README.md`
+- `PROGRESS.md`
+
 ### 2026-05-09: User-Configurable LLM Settings Migration
 
 Moved LLM config loading to a per-user config path so end users can edit settings outside source code.
