@@ -44,6 +44,24 @@ The app should favor React-rendered command and AI blocks, custom input styling,
 
 ## Progress Log
 
+### 2026-05-09: User-Configurable LLM Settings Migration
+
+Moved LLM config loading to a per-user config path so end users can edit settings outside source code.
+
+Reasoning:
+
+- The previous loader read `dweterm.config.json` from repository-relative paths, which is not user-editable in packaged installs.
+- On first run, the backend now provisions a user config file in the user's home directory and migrates from an existing source config file when available.
+- Subsequent AI requests always read `~/dweterm.config.json` (or `%USERPROFILE%\dweterm.config.json` on Windows), so changing model/base URL/timeout takes effect without rebuilding the app.
+- Migration logic now copies source config content to the user config file and never moves or deletes the source file from the repository.
+- When migration source is unavailable, the app seeds the user config file from the compiled default config template.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `README.md`
+- `PROGRESS.md`
+
 ### 2026-05-08: macOS/Zsh Platform Support
 
 Added macOS host support using Zsh while preserving the compile-time platform split used by Windows and Linux.

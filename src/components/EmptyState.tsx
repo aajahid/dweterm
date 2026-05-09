@@ -14,7 +14,7 @@ export function EmptyState({ cwd }: EmptyStateProps) {
           </p>
         </div>
         <div className="empty-card">
-          <span className="empty-card-eyebrow">Ask /agent</span>
+          <span className="empty-card-eyebrow">Ask AI</span>
           <h3>Start a question</h3>
           <p>
             Type <code>ai: explain Get-Process</code>, or press

@@ -112,7 +112,14 @@ export function Composer({ history, isBusy, onSubmit }: ComposerProps) {
 
   return (
     <form className="composer" onSubmit={handleSubmit}>
-      <div className="composer-row">
+      <div
+        className="composer-row"
+        onClick={(event) => {
+          if (event.target !== inputRef.current) {
+            inputRef.current?.focus();
+          }
+        }}
+      >
         <span className="composer-prompt">&gt;</span>
         <div className="composer-input-wrapper">
           <input
@@ -120,7 +127,7 @@ export function Composer({ history, isBusy, onSubmit }: ComposerProps) {
             type="text"
             className="composer-input"
             value={input}
-            placeholder="run a command, or write a question for /agent"
+            placeholder="run a command, or write a question for AI"
             onChange={(event) => {
               setInput(event.target.value);
               setHistoryIndex(null);
@@ -144,7 +151,7 @@ export function Composer({ history, isBusy, onSubmit }: ComposerProps) {
         <kbd>shift</kbd>
         <span className="hint-plus">+</span>
         <kbd>↵</kbd>
-        <span className="hint-text">new /agent conversation</span>
+        <span className="hint-text">start an AI prompt</span>
         <span className="hint-divider">·</span>
         <kbd>↑</kbd>
         <kbd>↓</kbd>

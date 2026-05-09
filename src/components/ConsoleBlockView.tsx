@@ -46,7 +46,7 @@ export function ConsoleBlockView({
         {command ? (
           <span className="block-command-prompt">&gt;</span>
         ) : (
-          <span className="block-ai-prompt">/agent</span>
+          <span className="block-ai-prompt">ai:</span>
         )}
         <pre className="block-command-text">{block.input}</pre>
       </div>

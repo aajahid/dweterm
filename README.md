@@ -197,7 +197,14 @@ Check available local models:
 ollama list
 ```
 
-The initial app config lives at `dweterm.config.json`:
+On first run, DweTerm migrates `dweterm.config.json` into the user's home directory and then always reads from that user-writable file:
+
+- macOS/Linux: `~/dweterm.config.json`
+- Windows: `%USERPROFILE%\dweterm.config.json`
+
+If no source config is found during first run, DweTerm seeds the user config file using the built-in default values.
+
+Default config shape:
 
 ```json
 {
