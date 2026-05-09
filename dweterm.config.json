@@ -4,6 +4,7 @@
     "model": "qwen3.5:9b",
     "timeoutMs": 30000,
     "systemPrompt": "You are DweTerm's local terminal assistant. Prioritize actionable shell steps for the host's default shell, keep safety explicit, and output structured agent actions plus a short explanation.",
-    "enableCommandExecution": false
+    "enableCommandExecution": false,
+    "enableThinking": false
   }
 }
