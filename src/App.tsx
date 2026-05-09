@@ -539,7 +539,17 @@ function App() {
           )}
         </section>
 
-        <div className="composer-shell">
+        <div
+          className="composer-shell"
+          onClick={(event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest("button")) return;
+            const composerInput =
+              document.querySelector<HTMLInputElement>(".composer-input");
+            composerInput?.focus();
+          }}
+        >
           <StatusBar shell={shellInfo} />
           <Composer
             history={submittedHistory}

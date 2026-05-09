@@ -13,6 +13,8 @@ mod shell;
 use shell::{platform, CommandResult, ShellInfo};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const CONFIG_FILE_NAME: &str = "dweterm.config.json";
+const DEFAULT_CONFIG_JSON: &str = include_str!("../../dweterm.config.json");
 
 #[derive(Debug, Deserialize)]
 struct DweTermConfig {
@@ -78,43 +80,80 @@ struct ShellState {
 fn config_candidates() -> Result<Vec<PathBuf>, String> {
     let current_dir = std::env::current_dir()
         .map_err(|error| format!("failed to read current directory: {error}"))?;
-    let mut candidates = vec![current_dir.join("dweterm.config.json")];
+    let mut candidates = vec![current_dir.join(CONFIG_FILE_NAME)];
 
     if let Some(parent) = current_dir.parent() {
-        candidates.push(parent.join("dweterm.config.json"));
+        candidates.push(parent.join(CONFIG_FILE_NAME));
     }
 
     if let Some(grandparent) = current_dir.parent().and_then(|parent| parent.parent()) {
-        candidates.push(grandparent.join("dweterm.config.json"));
+        candidates.push(grandparent.join(CONFIG_FILE_NAME));
     }
 
     Ok(candidates)
 }
 
-fn load_config() -> Result<DweTermConfig, String> {
-    let candidates = config_candidates()?;
-
-    for path in &candidates {
-        if !path.exists() {
-            continue;
+fn user_home_dir() -> Result<PathBuf, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(user_profile) = std::env::var_os("USERPROFILE") {
+            return Ok(PathBuf::from(user_profile));
         }
-
-        let config = fs::read_to_string(path)
-            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
-
-        return serde_json::from_str(&config)
-            .map_err(|error| format!("failed to parse {}: {error}", path.display()));
+        return Err("USERPROFILE is not set; cannot determine user home directory".to_string());
     }
 
-    let searched_paths = candidates
-        .iter()
-        .map(|path| path.display().to_string())
-        .collect::<Vec<_>>()
-        .join(", ");
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(home) = std::env::var_os("HOME") {
+            return Ok(PathBuf::from(home));
+        }
+        Err("HOME is not set; cannot determine user home directory".to_string())
+    }
+}
 
-    Err(format!(
-        "dweterm.config.json was not found; searched: {searched_paths}"
-    ))
+fn user_config_path() -> Result<PathBuf, String> {
+    Ok(user_home_dir()?.join(CONFIG_FILE_NAME))
+}
+
+fn ensure_user_config() -> Result<PathBuf, String> {
+    let user_config_path = user_config_path()?;
+    if user_config_path.exists() {
+        return Ok(user_config_path);
+    }
+
+    if let Some(parent) = user_config_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create user config directory {}: {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let source_config_path = config_candidates()?
+        .into_iter()
+        .find(|candidate| candidate.exists());
+
+    if let Some(source_path) = source_config_path {
+        if source_path != user_config_path {
+            let source_contents = fs::read_to_string(&source_path)
+                .map_err(|error| format!("failed to read {}: {error}", source_path.display()))?;
+            fs::write(&user_config_path, source_contents)
+                .map_err(|error| format!("failed to write {}: {error}", user_config_path.display()))?;
+            return Ok(user_config_path);
+        }
+    }
+
+    fs::write(&user_config_path, DEFAULT_CONFIG_JSON)
+        .map_err(|error| format!("failed to write {}: {error}", user_config_path.display()))?;
+    Ok(user_config_path)
+}
+
+fn load_config() -> Result<DweTermConfig, String> {
+    let path = ensure_user_config()?;
+    let config =
+        fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    serde_json::from_str(&config).map_err(|error| format!("failed to parse {}: {error}", path.display()))
 }
 
 fn compose_agent_system_prompt(base_prompt: &str) -> String {
@@ -422,6 +461,10 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ShellState::default())
         .plugin(tauri_plugin_opener::init())
+        .setup(|_| {
+            ensure_user_config()?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             ask_local_llm,
             ask_local_llm_stream,
