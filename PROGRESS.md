@@ -44,6 +44,41 @@ The app should favor React-rendered command and AI blocks, custom input styling,
 
 ## Progress Log
 
+### 2026-05-09: Window Controls Routed Through Backend Commands
+
+Fixed custom title bar action buttons so minimize, maximize/restore, and close work reliably in the frameless window.
+
+Reasoning:
+
+- Frontend window API calls can be blocked by capability/permission boundaries in some Tauri setups, which left controls visible but non-functional.
+- Added explicit Rust Tauri commands (`window_minimize`, `window_toggle_maximize`, `window_is_maximized`, `window_close`) and wired the React top bar buttons through `invoke`.
+- Maximize/restore icon state now follows the backend-reported window state after each toggle.
+
+Files changed:
+
+- `src-tauri/src/lib.rs`
+- `src/components/TopBar.tsx`
+- `PROGRESS.md`
+
+### 2026-05-09: Frameless Warp-Style Window Chrome
+
+Removed the native OS title bar and moved window controls into the existing custom top toolbar so the app window matches a Warp-style chrome.
+
+Reasoning:
+
+- The default Windows frame conflicted with the desired Warp-like UI and duplicated controls already present in the top toolbar.
+- Tauri window decorations are now disabled (`decorations: false`) so the app draws its own title area.
+- The React top bar now includes native window actions (minimize, maximize/restore, close) wired through Tauri's window API.
+- Drag behavior is preserved by making the top bar draggable while keeping inputs and buttons in explicit no-drag regions.
+
+Files changed:
+
+- `src-tauri/tauri.conf.json`
+- `src/components/TopBar.tsx`
+- `src/App.css`
+- `README.md`
+- `PROGRESS.md`
+
 ### 2026-05-09: Config Toggle for Thinking vs Non-Thinking LLM Requests
 
 Added a user-configurable switch that controls whether DweTerm asks Ollama for thinking output.

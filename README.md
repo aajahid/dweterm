@@ -6,7 +6,7 @@ The app uses a Warp/Cursor-style block console instead of direct terminal emulat
 
 ## Current Status
 
-The project has a Warp-style command workspace. The window has a slim top toolbar (sidebar/grid toggles, center search, profile area), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive executions of the host shell (PowerShell on Windows, Bash on Linux, Zsh on macOS); each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
+The project has a Warp-style command workspace. The app uses a custom frameless window (native title bar removed) with a slim top toolbar (sidebar/grid toggles, center search, profile area, custom minimize/maximize/close controls), a scrollable block history, a status bar with chips for shell, working directory, git branch, and dirty count, and a single-line composer with ghost autocomplete from history. Commands run as non-interactive executions of the host shell (PowerShell on Windows, Bash on Linux, Zsh on macOS); each block shows a colored prompt header line (app version, path, `git:(branch)`, dirty/ahead/behind counts, duration) above the command and its output. Natural-language prompts render as `/agent` blocks backed by local Ollama.
 
 ## Supported Platforms
 
