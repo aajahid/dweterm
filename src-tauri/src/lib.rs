@@ -6,7 +6,7 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, Window};
 
 mod shell;
 
@@ -465,6 +465,48 @@ fn run_shell_command(
     })
 }
 
+#[tauri::command]
+fn window_minimize(window: Window) -> Result<(), String> {
+    window
+        .minimize()
+        .map_err(|error| format!("failed to minimize window: {error}"))
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: Window) -> Result<bool, String> {
+    let is_maximized = window
+        .is_maximized()
+        .map_err(|error| format!("failed to read maximize state: {error}"))?;
+
+    if is_maximized {
+        window
+            .unmaximize()
+            .map_err(|error| format!("failed to restore window: {error}"))?;
+    } else {
+        window
+            .maximize()
+            .map_err(|error| format!("failed to maximize window: {error}"))?;
+    }
+
+    window
+        .is_maximized()
+        .map_err(|error| format!("failed to read maximize state: {error}"))
+}
+
+#[tauri::command]
+fn window_is_maximized(window: Window) -> Result<bool, String> {
+    window
+        .is_maximized()
+        .map_err(|error| format!("failed to read maximize state: {error}"))
+}
+
+#[tauri::command]
+fn window_close(window: Window) -> Result<(), String> {
+    window
+        .close()
+        .map_err(|error| format!("failed to close window: {error}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -478,7 +520,11 @@ pub fn run() {
             ask_local_llm,
             ask_local_llm_stream,
             run_shell_command,
-            get_shell_info
+            get_shell_info,
+            window_minimize,
+            window_toggle_maximize,
+            window_is_maximized,
+            window_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
