@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, State, Window};
+use tauri_plugin_opener::OpenerExt;
 
 mod shell;
 
@@ -120,6 +121,18 @@ fn user_home_dir() -> Result<PathBuf, String> {
 
 fn user_config_path() -> Result<PathBuf, String> {
     Ok(user_home_dir()?.join(CONFIG_FILE_NAME))
+}
+
+#[tauri::command]
+fn open_user_config(app: AppHandle) -> Result<(), String> {
+    let path = user_config_path()?;
+    if !path.exists() {
+        ensure_user_config()?;
+    }
+    let path_str = path.to_string_lossy().to_string();
+    app.opener()
+        .open_path(path_str, None::<&str>)
+        .map_err(|error| format!("failed to open config file: {error}"))
 }
 
 fn ensure_user_config() -> Result<PathBuf, String> {
@@ -512,7 +525,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ShellState::default())
         .plugin(tauri_plugin_opener::init())
-        .setup(|_| {
+        .setup(|app| {
             ensure_user_config()?;
             Ok(())
         })
@@ -524,7 +537,8 @@ pub fn run() {
             window_minimize,
             window_toggle_maximize,
             window_is_maximized,
-            window_close
+            window_close,
+            open_user_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

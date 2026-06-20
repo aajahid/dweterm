@@ -1,22 +1,8 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-type TopBarProps = {
-  onSearch?: (query: string) => void;
-};
-
-export function TopBar({ onSearch }: TopBarProps) {
-  const [query, setQuery] = useState("");
+export function TopBar() {
   const [isMaximized, setIsMaximized] = useState(false);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onSearch?.(query.trim());
-  };
-
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setQuery(event.target.value);
-  };
 
   useEffect(() => {
     const syncMaximizedState = async () => {
@@ -114,41 +100,6 @@ function SidebarIcon() {
         strokeWidth="1.2"
       />
       <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  );
-}
-
-function GridIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.85" />
-      <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.85" />
-      <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.85" />
-      <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.85" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <circle
-        cx="7"
-        cy="7"
-        r="4.25"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <line
-        x1="10.4"
-        y1="10.4"
-        x2="13.5"
-        y2="13.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }

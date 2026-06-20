@@ -87,6 +87,24 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === ",") {
+        event.preventDefault();
+        try {
+          await invoke("open_user_config");
+        } catch (error) {
+          console.error("Failed to open config:", error);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
     let unlisten: (() => void) | null = null;
 
     void (async () => {
