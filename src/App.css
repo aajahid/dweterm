@@ -82,7 +82,6 @@ button {
     border-bottom: 1px solid var(--color-border);
     user-select: none;
     -webkit-user-select: none;
-    -webkit-app-region: drag;
 }
 
 .top-bar-left,
@@ -97,8 +96,13 @@ button {
     gap: 6px;
 }
 
-.no-drag {
-    -webkit-app-region: no-drag;
+.top-bar-spacer {
+    height: 100%;
+}
+
+/* Reserve room for the native macOS traffic lights. */
+.top-bar-mac .top-bar-left {
+    padding-left: 74px;
 }
 
 .top-icon-button {

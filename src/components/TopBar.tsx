@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-export function TopBar() {
+type TopBarProps = {
+  onSearch?: (query: string) => void;
+};
+
+// macOS draws its own traffic lights (see tauri.macos.conf.json), so the custom
+// window controls are only rendered on Windows and Linux.
+const isMac = navigator.userAgent.includes("Mac OS X");
+
+export function TopBar({ onSearch }: TopBarProps) {
+  const [query, setQuery] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
+    if (isMac) {
+      return;
+    }
+
     const syncMaximizedState = async () => {
       try {
         setIsMaximized(await invoke<boolean>("window_is_maximized"));
@@ -36,11 +49,16 @@ export function TopBar() {
   };
 
   return (
-    <header className="top-bar" data-tauri-drag-region>
-      <div className="top-bar-left">
+    <header
+      className={isMac ? "top-bar top-bar-mac" : "top-bar"}
+      data-tauri-drag-region
+    >
+      {/* Tauri only starts a drag when the exact mousedown target carries
+          data-tauri-drag-region, so every filler element repeats it. */}
+      <div className="top-bar-left" data-tauri-drag-region>
         <button
           type="button"
-          className="top-icon-button no-drag"
+          className="top-icon-button"
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
         >
@@ -48,39 +66,40 @@ export function TopBar() {
         </button>
       </div>
 
-    <div></div>
-    
+      <div className="top-bar-spacer" data-tauri-drag-region />
 
-      <div className="top-bar-right">
-        <div className="window-controls no-drag" aria-label="Window controls">
-          <button
-            type="button"
-            className="window-control-button"
-            aria-label="Minimize window"
-            title="Minimize"
-            onClick={() => void handleMinimize()}
-          >
-            <MinimizeIcon />
-          </button>
-          <button
-            type="button"
-            className="window-control-button"
-            aria-label={isMaximized ? "Restore window" : "Maximize window"}
-            title={isMaximized ? "Restore" : "Maximize"}
-            onClick={() => void handleToggleMaximize()}
-          >
-            {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
-          </button>
-          <button
-            type="button"
-            className="window-control-button window-control-close"
-            aria-label="Close window"
-            title="Close"
-            onClick={() => void handleClose()}
-          >
-            <CloseIcon />
-          </button>
-        </div>
+      <div className="top-bar-right" data-tauri-drag-region>
+        {!isMac && (
+          <div className="window-controls" aria-label="Window controls">
+            <button
+              type="button"
+              className="window-control-button"
+              aria-label="Minimize window"
+              title="Minimize"
+              onClick={() => void handleMinimize()}
+            >
+              <MinimizeIcon />
+            </button>
+            <button
+              type="button"
+              className="window-control-button"
+              aria-label={isMaximized ? "Restore window" : "Maximize window"}
+              title={isMaximized ? "Restore" : "Maximize"}
+              onClick={() => void handleToggleMaximize()}
+            >
+              {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
+            </button>
+            <button
+              type="button"
+              className="window-control-button window-control-close"
+              aria-label="Close window"
+              title="Close"
+              onClick={() => void handleClose()}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
